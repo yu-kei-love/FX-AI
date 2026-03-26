@@ -1,0 +1,260 @@
+============================================================
+Stock Model Improvement Analysis - 2026-03-27 05:52
+Baseline: japan_stock_model.py v3.4
+============================================================
+
+[LOAD] Loading data...
+  Loaded: 50 datasets
+
+============================================================
+[TEST 1] テクニカル指標特徴量の効果
+============================================================
+
+  ^N225 (Nikkei225):
+    Baseline:     Acc=66.1% PF=1.95 Sharpe=2.72 Trades=127
+    +Technical:   Acc=68.0% PF=2.13 Sharpe=2.99 Trades=122
+    Delta PF:     +0.18
+
+  8035.T (Tokyo_Electron):
+    Baseline:     Acc=62.5% PF=1.67 Sharpe=2.10 Trades=128
+    +Technical:   Acc=62.1% PF=1.64 Sharpe=2.00 Trades=124
+    Delta PF:     -0.03
+
+  7203.T (Toyota):
+    Baseline:     Acc=50.4% PF=1.02 Sharpe=0.07 Trades=125
+    +Technical:   Acc=52.8% PF=1.12 Sharpe=0.46 Trades=125
+    Delta PF:     +0.10
+
+  8306.T (MUFG):
+    Baseline:     Acc=59.7% PF=1.48 Sharpe=1.70 Trades=139
+    +Technical:   Acc=59.6% PF=1.47 Sharpe=1.69 Trades=141
+    Delta PF:     -0.01
+
+  6758.T (Sony):
+    Baseline:     Acc=48.0% PF=0.92 Sharpe=-0.33 Trades=125
+    +Technical:   Acc=47.6% PF=0.91 Sharpe=-0.39 Trades=126
+    Delta PF:     -0.01
+
+============================================================
+[TEST 2] クロスマーケット + インタラクション特徴量
+============================================================
+
+  ^N225 (Nikkei225):
+    Baseline:      Acc=66.1% PF=1.95 Sharpe=2.72 Trades=127
+    +CrossMarket:  Acc=69.0% PF=2.22 Sharpe=3.32 Trades=129
+    Delta PF:      +0.27
+
+  8035.T (Tokyo_Electron):
+    Baseline:      Acc=62.5% PF=1.67 Sharpe=2.10 Trades=128
+    +CrossMarket:  Acc=61.9% PF=1.62 Sharpe=2.03 Trades=126
+    Delta PF:      -0.05
+
+  7203.T (Toyota):
+    Baseline:      Acc=50.4% PF=1.02 Sharpe=0.07 Trades=125
+    +CrossMarket:  Acc=56.1% PF=1.28 Sharpe=1.02 Trades=123
+    Delta PF:      +0.26
+
+  8306.T (MUFG):
+    Baseline:      Acc=59.7% PF=1.48 Sharpe=1.70 Trades=139
+    +CrossMarket:  Acc=59.3% PF=1.45 Sharpe=1.63 Trades=135
+    Delta PF:      -0.03
+
+  6758.T (Sony):
+    Baseline:      Acc=48.0% PF=0.92 Sharpe=-0.33 Trades=125
+    +CrossMarket:  Acc=50.8% PF=1.03 Sharpe=0.13 Trades=132
+    Delta PF:      +0.11
+
+============================================================
+[TEST 3] ハイパーパラメータ最適化
+============================================================
+
+  Baseline (n=200, lr=0.05, depth=6, power=3):
+    Acc=66.1% PF=1.95 Sharpe=2.72 Trades=127
+
+  n_est    lr depth power |    Acc     PF Sharpe Trades
+  ------------------------------------------------------------
+    150  0.05     6     3 | 67.8%  2.10  2.93    121
+    300  0.05     6     3 | 66.4%  1.98  2.85    134
+    200  0.03     6     3 | 66.7%  2.00  2.73    120
+    200  0.08     6     3 | 66.7%  2.00  3.04    147
+    200  0.05     4     3 | 69.3%  2.26  3.25    124
+    200  0.05     8     3 | 66.7%  2.00  2.84    129
+    200  0.05     6     2 | 65.9%  1.93  2.67    126
+    200  0.05     6     4 | 66.7%  2.00  2.80    126
+    200  0.05     6     5 | 66.1%  1.95  2.69    124
+    300  0.03     6     3 | 67.5%  2.07  2.94    126
+    300  0.05     4     4 | 68.3%  2.16  3.02    120
+
+  Best params: n_est=200, lr=0.05, depth=4, power=3
+
+============================================================
+[TEST 4] Confidence/Agreement 閾値スイープ
+============================================================
+
+   Conf Agree |    Acc     PF Sharpe Trades WinRate
+  ------------------------------------------------------------
+  0.52      3 | 63.9%   1.77   2.71    169   63.9%
+  0.52      4 | 66.0%   1.94   2.97    153   66.0%
+  0.52      5 | 69.4%   2.26   3.07    111   69.4%
+  0.54      3 | 65.8%   1.93   3.05    164   65.8%
+  0.54      4 | 67.3%   2.06   3.20    150   67.3%
+  0.54      5 | 69.4%   2.26   3.07    111   69.4%
+  0.56      3 | 66.9%   2.02   3.12    151   66.9%
+  0.56      4 | 67.8%   2.11   3.24    146   67.8%
+  0.56      5 | 69.4%   2.26   3.07    111   69.4%
+  0.58      3 | 66.2%   1.96   2.86    139   66.2%
+  0.58      4 | 67.2%   2.04   3.02    137   67.2%
+  0.58      5 | 69.2%   2.24   2.98    107   69.2%
+  0.60      3 | 65.6%   1.91   2.64    128   65.6%
+  0.60      4 | 66.1%   1.95   2.72    127   66.1% <-- current
+  0.60      5 | 68.6%   2.18   2.85    105   68.6%
+  0.62      3 | 67.0%   2.03   2.72    115   67.0%
+  0.62      4 | 67.5%   2.08   2.81    114   67.5%
+  0.62      5 | 70.0%   2.33   3.00    100   70.0%
+  0.64      3 | 69.1%   2.24   3.01    110   69.1%
+  0.64      4 | 69.7%   2.30   3.10    109   69.7%
+  0.64      5 | 71.9%   2.56   3.23     96   71.9%
+  0.66      3 | 71.3%   2.48   3.22    101   71.3%
+  0.66      4 | 72.0%   2.57   3.32    100   72.0%
+  0.66      5 | 73.0%   2.71   3.27     89   73.0%
+  0.68      3 | 70.9%   2.44   2.91     86   70.9%
+  0.68      4 | 70.9%   2.44   2.91     86   70.9%
+  0.68      5 | 72.8%   2.68   3.09     81   72.8%
+  0.70      3 | 74.0%   2.84   3.08     73   74.0%
+  0.70      4 | 74.0%   2.84   3.08     73   74.0%
+  0.70      5 | 74.3%   2.89   3.05     70   74.3%
+  0.72      3 | 74.6%   2.93   2.83     59   74.6%
+  0.72      4 | 74.6%   2.93   2.83     59   74.6%
+  0.72      5 | 75.9%   3.14   2.96     58   75.9%
+  0.74      3 | 75.5%   3.08   2.67     49   75.5%
+  0.74      4 | 75.5%   3.08   2.67     49   75.5%
+  0.74      5 | 75.5%   3.08   2.67     49   75.5%
+
+  Best thresholds: Conf=0.72, Agree=5
+  (Current: Conf=0.6, Agree=4)
+
+============================================================
+[TEST 5] ボラティリティレジーム別フィルタリング
+============================================================
+
+                     Regime |    Acc     PF Trades WinRate
+  ------------------------------------------------------------
+              Low VIX (<15) | 92.3%  12.00     13   92.3%
+            Mid VIX (15-20) | 64.4%   1.81     90   64.4%
+       High-Mid VIX (20-25) | 54.5%   1.20     22   54.5%
+           High VIX (25-30) | insufficient data (2 bars)
+        Very High VIX (>30) | insufficient data (0 bars)
+
+  Best VIX regime: 0-15 (PF=12.00)
+
+============================================================
+[TEST 6] 曜日別分析 + フィルタリング
+============================================================
+
+  All predictions by day:
+     Day | Samples    Acc UpRatio
+  ----------------------------------------
+     Mon |      33  51.5%   57.6%
+     Tue |      39  66.7%   51.3%
+     Wed |      38  68.4%   65.8%
+     Thu |      39  64.1%   48.7%
+     Fri |      40  60.0%   50.0%
+
+  High confidence signals by day (Conf>=0.6, Agree>=4):
+     Day | Signals    Acc     PF
+  ----------------------------------------
+     Mon |      20  60.0%   1.50
+     Tue |      27  63.0%   1.70
+     Wed |      24  79.2%   3.80
+     Thu |      26  69.2%   2.25
+     Fri |      30  60.0%   1.50
+
+  Profitable days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+
+============================================================
+[TEST 7] 全改善組み合わせ vs ベースライン (最終比較)
+============================================================
+
+  Hyperparams: n_est=200, lr=0.05, depth=4, power=3
+  Thresholds: Conf=0.72, Agree=5
+  VIX filter: 0-15
+  Day filter: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+
+  ^N225 (Nikkei225):
+    Baseline:   Acc=66.1% PF=1.95 Sharpe=2.72 MDD=6 Trades=127
+    Improved:   Acc=100.0% PF=inf Sharpe=1.51 MDD=0 Trades=4
+    Delta:      Acc=+33.9% PF=+inf Sharpe=-1.21
+    Improved?:  YES
+
+  8035.T (Tokyo_Electron):
+    Baseline:   Acc=62.5% PF=1.67 Sharpe=2.10 MDD=6 Trades=128
+    Improved:   Acc=100.0% PF=inf Sharpe=1.51 MDD=0 Trades=4
+    Delta:      Acc=+37.5% PF=+inf Sharpe=-0.59
+    Improved?:  YES
+
+  6857.T (Advantest):
+    Baseline:   Acc=67.8% PF=2.10 Sharpe=3.27 MDD=4 Trades=149
+    Improved:   Acc=71.4% PF=2.50 Sharpe=1.21 MDD=1 Trades=14
+    Delta:      Acc=+3.6% PF=+0.40 Sharpe=-2.06
+    Improved?:  YES
+
+  7203.T (Toyota):
+    Baseline:   Acc=50.4% PF=1.02 Sharpe=0.07 MDD=11 Trades=125
+    Improved:   Acc=0.0% PF=0.00 Sharpe=-1.31 MDD=2 Trades=3
+    Delta:      Acc=-50.4% PF=-1.02 Sharpe=-1.38
+    Improved?:  NO
+
+  6758.T (Sony):
+    Baseline:   Acc=48.0% PF=0.92 Sharpe=-0.33 MDD=10 Trades=125
+    Improved:   Acc=60.0% PF=1.50 Sharpe=0.34 MDD=2 Trades=5
+    Delta:      Acc=+12.0% PF=+0.58 Sharpe=+0.67
+    Improved?:  YES
+
+  8306.T (MUFG):
+    Baseline:   Acc=59.7% PF=1.48 Sharpe=1.70 MDD=4 Trades=139
+    Improved:   Acc=33.3% PF=0.50 Sharpe=-0.44 MDD=1 Trades=3
+    Delta:      Acc=-26.4% PF=-0.98 Sharpe=-2.14
+    Improved?:  NO
+
+  7974.T (Nintendo):
+    Baseline:   Acc=45.1% PF=0.82 Sharpe=-0.83 MDD=20 Trades=133
+    Improved:   Acc=54.5% PF=1.20 Sharpe=0.23 MDD=2 Trades=11
+    Delta:      Acc=+9.4% PF=+0.38 Sharpe=+1.06
+    Improved?:  YES
+
+  7267.T (Honda):
+    Baseline:   Acc=59.4% PF=1.46 Sharpe=1.54 MDD=7 Trades=123
+    Improved:   Acc=0.0% PF=0.00 Sharpe=-0.75 MDD=0 Trades=1
+    Delta:      Acc=-59.4% PF=-1.46 Sharpe=-2.29
+    Improved?:  NO
+
+============================================================
+FINAL SUMMARY
+============================================================
+
+  Stocks tested:    8
+  Improved:         5 / 8
+  Avg Baseline PF:  1.43
+  Avg Improved PF:  inf
+  Avg Delta PF:     +inf
+  Avg Delta Sharpe: -0.99
+
+  Per-stock results:
+      Ticker               Name  Base PF  Impr PF   Delta  Improved
+  ----------------------------------------------------------------------
+       ^N225          Nikkei225     1.95      inf    +inf       YES
+      8035.T     Tokyo_Electron     1.67      inf    +inf       YES
+      6857.T          Advantest     2.10     2.50   +0.40       YES
+      7203.T             Toyota     1.02     0.00   -1.02        NO
+      6758.T               Sony     0.92     1.50   +0.58       YES
+      8306.T               MUFG     1.48     0.50   -0.98        NO
+      7974.T           Nintendo     0.82     1.20   +0.38       YES
+      7267.T              Honda     1.46     0.00   -1.46        NO
+
+  CONCLUSION: Improvements are significant (5/8 stocks improved)
+  RECOMMENDATION: Update japan_stock_model.py to v4.0
+
+Results saved to: C:\Users\kawanoyuu\Desktop\FX-AI\research\stock\improvement_results.txt
+v4.0
+
+Results saved to: C:\Users\kawanoyuu\Desktop\FX-AI\research\stock\improvement_results.txt
