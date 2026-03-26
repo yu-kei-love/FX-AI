@@ -21,3 +21,142 @@ Early stopping, best iteration is:
 [187]	val-logloss:0.69240
 2026-03-27 05:42:37,047 [INFO] crypto_hybrid: XGBoost best iteration: 87
 2026-03-27 05:42:37,054 [INFO] crypto_hybrid: Training BiLSTM-Attention model...
+2026-03-27 05:45:39,140 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.2784  val_loss=1.5457  lr=5.00e-04
+2026-03-27 05:47:46,710 [INFO] crypto_hybrid:   Early stopping at epoch 17
+2026-03-27 05:47:47,832 [INFO] crypto_hybrid: Training Simplified TFT model...
+2026-03-27 05:49:51,476 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.6770  val_loss=0.7021  lr=5.00e-04
+2026-03-27 05:51:58,455 [INFO] crypto_hybrid:   Epoch 20: train_loss=0.5633  val_loss=0.7202  lr=1.25e-04
+2026-03-27 05:52:31,072 [INFO] crypto_hybrid:   Early stopping at epoch 22
+2026-03-27 05:52:33,136 [INFO] crypto_hybrid: Meta-ensemble LR coefficients: [[0.43203923 1.62313429 0.14871331]]
+2026-03-27 05:52:33,142 [INFO] crypto_hybrid: Fold 1 results: {'accuracy': 0.8571, 'precision': 0.8571, 'recall': 1.0, 'f1': 0.9231, 'sharpe': np.float64(1.528), 'per_trade_sharpe': np.float64(1.528), 'profit_factor': np.float64(2.8279), 'max_drawdown': np.float64(0.0108), 'trade_count': 14, 'total_bars': 820, 'win_rate': np.float64(0.8571), 'total_return': 0.0363, 'fold': 1}
+2026-03-27 05:52:33,142 [INFO] crypto_hybrid: 
+============================================================
+2026-03-27 05:52:33,142 [INFO] crypto_hybrid: Walk-Forward Fold 2
+2026-03-27 05:52:33,142 [INFO] crypto_hybrid:   Train: 6210 | Val: 988 | Test: 988
+2026-03-27 05:52:33,142 [INFO] crypto_hybrid: ============================================================
+2026-03-27 05:52:33,144 [INFO] crypto_hybrid: Training LightGBM...
+2026-03-27 05:52:33,144 [INFO] crypto_hybrid: Using profit-weighted custom loss function
+2026-03-27 05:52:33,486 [INFO] crypto_hybrid: LightGBM best iteration: 3
+2026-03-27 05:52:33,488 [INFO] crypto_hybrid: Training XGBoost...
+Training until validation scores don't improve for 100 rounds
+Early stopping, best iteration is:
+[3]	valid_0's profit_weighted_acc: 0.581559
+[0]	val-logloss:0.69386
+[200]	val-logloss:0.68087
+[400]	val-logloss:0.67912
+[544]	val-logloss:0.67998
+2026-03-27 05:52:35,243 [INFO] crypto_hybrid: XGBoost best iteration: 444
+2026-03-27 05:52:35,250 [INFO] crypto_hybrid: Training BiLSTM-Attention model...
+2026-03-27 05:58:07,403 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.2344  val_loss=1.7389  lr=5.00e-04
+2026-03-27 06:00:55,208 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 06:00:56,360 [INFO] crypto_hybrid: Training Simplified TFT model...
+2026-03-27 06:04:22,656 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.5898  val_loss=0.8311  lr=1.00e-03
+2026-03-27 06:07:48,790 [INFO] crypto_hybrid:   Epoch 20: train_loss=0.3868  val_loss=1.1818  lr=2.50e-04
+2026-03-27 06:08:30,213 [INFO] crypto_hybrid:   Early stopping at epoch 22
+2026-03-27 06:08:32,014 [INFO] crypto_hybrid: Meta-ensemble LR coefficients: [[0.75597423 1.33620327 1.44631808]]
+2026-03-27 06:08:32,016 [INFO] crypto_hybrid: Fold 2 results: {'accuracy': 0, 'precision': 0, 'recall': 0, 'f1': 0, 'sharpe': 0, 'max_drawdown': 0, 'trade_count': 0, 'win_rate': 0, 'fold': 2}
+2026-03-27 06:08:32,016 [INFO] crypto_hybrid: 
+============================================================
+2026-03-27 06:08:32,016 [INFO] crypto_hybrid: Walk-Forward Fold 3
+2026-03-27 06:08:32,016 [INFO] crypto_hybrid:   Train: 8186 | Val: 988 | Test: 988
+2026-03-27 06:08:32,016 [INFO] crypto_hybrid: ============================================================
+2026-03-27 06:08:32,018 [INFO] crypto_hybrid: Training LightGBM...
+2026-03-27 06:08:32,018 [INFO] crypto_hybrid: Using profit-weighted custom loss function
+2026-03-27 06:08:32,178 [INFO] crypto_hybrid: LightGBM best iteration: 5
+2026-03-27 06:08:32,178 [INFO] crypto_hybrid: Training XGBoost...
+Training until validation scores don't improve for 100 rounds
+Early stopping, best iteration is:
+[5]	valid_0's profit_weighted_acc: 0.609258
+[0]	val-logloss:0.69056
+[200]	val-logloss:0.68148
+[351]	val-logloss:0.68147
+2026-03-27 06:08:32,804 [INFO] crypto_hybrid: XGBoost best iteration: 251
+2026-03-27 06:08:32,810 [INFO] crypto_hybrid: Training BiLSTM-Attention model...
+2026-03-27 06:14:30,066 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.2275  val_loss=1.2847  lr=5.00e-04
+2026-03-27 06:18:03,293 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 06:18:04,372 [INFO] crypto_hybrid: Training Simplified TFT model...
+2026-03-27 06:22:40,469 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.6132  val_loss=0.7443  lr=5.00e-04
+2026-03-27 06:26:50,106 [INFO] crypto_hybrid:   Early stopping at epoch 19
+2026-03-27 06:26:51,819 [INFO] crypto_hybrid: Meta-ensemble LR coefficients: [[1.15827853 2.29013359 0.1187892 ]]
+2026-03-27 06:26:51,824 [INFO] crypto_hybrid: Fold 3 results: {'accuracy': 0.4667, 'precision': 0.4667, 'recall': 1.0, 'f1': 0.6364, 'sharpe': np.float64(-2.3172), 'per_trade_sharpe': np.float64(-2.3172), 'profit_factor': np.float64(0.1633), 'max_drawdown': np.float64(0.1112), 'trade_count': 15, 'total_bars': 820, 'win_rate': np.float64(0.4667), 'total_return': -0.1183, 'fold': 3}
+2026-03-27 06:26:51,824 [INFO] crypto_hybrid: 
+============================================================
+2026-03-27 06:26:51,824 [INFO] crypto_hybrid: Walk-Forward Fold 4
+2026-03-27 06:26:51,824 [INFO] crypto_hybrid:   Train: 10162 | Val: 988 | Test: 988
+2026-03-27 06:26:51,824 [INFO] crypto_hybrid: ============================================================
+2026-03-27 06:26:51,828 [INFO] crypto_hybrid: Training LightGBM...
+2026-03-27 06:26:51,828 [INFO] crypto_hybrid: Using profit-weighted custom loss function
+2026-03-27 06:26:51,982 [INFO] crypto_hybrid: LightGBM best iteration: 7
+2026-03-27 06:26:51,982 [INFO] crypto_hybrid: Training XGBoost...
+Training until validation scores don't improve for 100 rounds
+Early stopping, best iteration is:
+[7]	valid_0's profit_weighted_acc: 0.543421
+[0]	val-logloss:0.69188
+[143]	val-logloss:0.69140
+2026-03-27 06:26:52,264 [INFO] crypto_hybrid: XGBoost best iteration: 43
+2026-03-27 06:26:52,268 [INFO] crypto_hybrid: Training BiLSTM-Attention model...
+2026-03-27 06:34:17,560 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.2371  val_loss=2.4747  lr=5.00e-04
+2026-03-27 06:38:45,028 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 06:38:46,090 [INFO] crypto_hybrid: Training Simplified TFT model...
+2026-03-27 06:44:31,674 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.5645  val_loss=0.8792  lr=5.00e-04
+2026-03-27 06:47:59,517 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 06:48:01,641 [INFO] crypto_hybrid: Meta-ensemble LR coefficients: [[ 0.21648184 -0.27433218  0.04902065]]
+2026-03-27 06:48:01,641 [INFO] crypto_hybrid: Fold 4 results: {'accuracy': 0, 'precision': 0, 'recall': 0, 'f1': 0, 'sharpe': 0, 'max_drawdown': 0, 'trade_count': 0, 'win_rate': 0, 'fold': 4}
+2026-03-27 06:48:01,641 [INFO] crypto_hybrid: 
+============================================================
+2026-03-27 06:48:01,643 [INFO] crypto_hybrid: Walk-Forward Fold 5
+2026-03-27 06:48:01,643 [INFO] crypto_hybrid:   Train: 12138 | Val: 988 | Test: 870
+2026-03-27 06:48:01,643 [INFO] crypto_hybrid: ============================================================
+2026-03-27 06:48:01,645 [INFO] crypto_hybrid: Training LightGBM...
+2026-03-27 06:48:01,645 [INFO] crypto_hybrid: Using profit-weighted custom loss function
+2026-03-27 06:48:02,100 [INFO] crypto_hybrid: LightGBM best iteration: 290
+2026-03-27 06:48:02,100 [INFO] crypto_hybrid: Training XGBoost...
+Training until validation scores don't improve for 100 rounds
+[200]	valid_0's profit_weighted_acc: 0.552416
+Early stopping, best iteration is:
+[290]	valid_0's profit_weighted_acc: 0.561161
+[0]	val-logloss:0.69626
+[177]	val-logloss:0.69433
+2026-03-27 06:48:02,432 [INFO] crypto_hybrid: XGBoost best iteration: 77
+2026-03-27 06:48:02,441 [INFO] crypto_hybrid: Training BiLSTM-Attention model...
+2026-03-27 06:56:43,512 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.2285  val_loss=2.5575  lr=5.00e-04
+2026-03-27 07:01:59,076 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 07:02:00,224 [INFO] crypto_hybrid: Training Simplified TFT model...
+2026-03-27 07:08:49,891 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.5455  val_loss=1.0355  lr=5.00e-04
+2026-03-27 07:13:34,657 [INFO] crypto_hybrid:   Early stopping at epoch 17
+2026-03-27 07:13:36,604 [INFO] crypto_hybrid: Meta-ensemble LR coefficients: [[ 2.44455988 -1.45578789 -0.24272809]]
+2026-03-27 07:13:36,609 [INFO] crypto_hybrid: Fold 5 results: {'accuracy': 0.6667, 'precision': 0.0, 'recall': 0.0, 'f1': 0.0, 'sharpe': np.float64(1.0376), 'per_trade_sharpe': np.float64(1.0376), 'profit_factor': np.float64(1.415), 'max_drawdown': np.float64(0.1809), 'trade_count': 60, 'total_bars': 702, 'win_rate': np.float64(0.6667), 'total_return': 0.1114, 'fold': 5}
+2026-03-27 07:13:36,609 [INFO] crypto_hybrid: 
+============================================================
+2026-03-27 07:13:36,609 [INFO] crypto_hybrid: Final retraining on full dataset for deployment...
+2026-03-27 07:13:36,609 [INFO] crypto_hybrid: ============================================================
+2026-03-27 07:13:36,609 [INFO] crypto_hybrid: Training LightGBM...
+2026-03-27 07:13:36,609 [INFO] crypto_hybrid: Using profit-weighted custom loss function
+2026-03-27 07:13:36,881 [INFO] crypto_hybrid: LightGBM best iteration: 20
+2026-03-27 07:13:36,881 [INFO] crypto_hybrid: Training XGBoost...
+Training until validation scores don't improve for 100 rounds
+Early stopping, best iteration is:
+[20]	valid_0's profit_weighted_acc: 0.538503
+[0]	val-logloss:0.69364
+[101]	val-logloss:0.69910
+2026-03-27 07:13:37,181 [INFO] crypto_hybrid: XGBoost best iteration: 1
+2026-03-27 07:13:37,187 [INFO] crypto_hybrid: Training BiLSTM-Attention model...
+2026-03-27 07:20:56,320 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.2425  val_loss=1.9605  lr=5.00e-04
+2026-03-27 07:25:19,827 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 07:25:22,542 [INFO] crypto_hybrid: Training Simplified TFT model...
+2026-03-27 07:30:58,912 [INFO] crypto_hybrid:   Epoch 10: train_loss=0.5403  val_loss=0.9234  lr=5.00e-04
+2026-03-27 07:34:17,213 [INFO] crypto_hybrid:   Early stopping at epoch 16
+2026-03-27 07:34:21,225 [INFO] crypto_hybrid: Meta-ensemble LR coefficients: [[ 0.03371757 -0.0837583   0.00934815]]
+2026-03-27 07:34:21,225 [INFO] crypto_hybrid: Platt calibration fitted on val: range [0.4996, 0.5390]
+2026-03-27 07:34:21,230 [INFO] crypto_hybrid: Calibrated pred range [0.5059, 0.5059]
+2026-03-27 07:34:21,230 [INFO] crypto_hybrid: Calibrated mean: 0.5059, <0.5: 0/1950
+2026-03-27 07:34:21,274 [INFO] crypto_hybrid: All models saved to C:\Users\kawanoyuu\Desktop\FX-AI\research\crypto\models
+Traceback (most recent call last):
+  File "<string>", line 4, in <module>
+  File "C:\Users\kawanoyuu\Desktop\FX-AI\research\crypto\hybrid_model.py", line 1529, in train_and_evaluate
+    vals = [m[key] for m in all_fold_metrics]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kawanoyuu\Desktop\FX-AI\research\crypto\hybrid_model.py", line 1529, in <listcomp>
+    vals = [m[key] for m in all_fold_metrics]
+            ~^^^^^
+KeyError: 'per_trade_sharpe'

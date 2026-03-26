@@ -235,7 +235,13 @@
       "Bash(git push:*)",
       "Bash(powershell -Command \"powercfg /change standby-timeout-ac 0; powercfg /change monitor-timeout-ac 0; echo ''スリープ・モニタOFFを無効化しました''\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python research/boat/validate_real_data.py)",
+      "Bash(python research/fx_v35_validation.py)",
+      "Bash(python research/stock/stock_improvement.py)",
+      "Bash(tasklist /FI 'IMAGENAME eq python.exe')",
+      "Bash(findstr python:*)",
+      "Bash(python -c \"from research.crypto.crypto_model import get_model; m = get_model\\(\\); m.train_and_evaluate\\(''data/crypto/btc_1h.csv''\\)\")"
     ]
   }
 }

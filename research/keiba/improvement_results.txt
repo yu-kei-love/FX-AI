@@ -1,0 +1,182 @@
+======================================================================
+競馬予測モデル改善テスト
+日時: 2026-03-27 05:42
+======================================================================
+
+[Data] 合成データ生成 (6000レース)...
+[データ生成] 6000レース、82622行 -> C:\Users\kawanoyuu\Desktop\FX-AI\data\keiba\race_results_v2.csv
+  82622 行, 6000 レース
+
+======================================================================
+BASELINE (現行モデル v2.1)
+======================================================================
+  PF=0.5585, RR=50.1%, bets=145, hit=10.3%, features=37, time=1183.1s
+
+======================================================================
+TEST: 1. Track Condition Interactions (馬場状態 x 距離 x 脚質)
+======================================================================
+  PF=0.4030 (delta=-0.1555), RR=37.2% (delta=-12.9%), bets=183, hit=7.7%, features=42, time=1104.5s
+  -> NOT BENEFICIAL
+
+======================================================================
+TEST: 2. Pace Prediction Features (ペース予測)
+======================================================================
+  PF=0.4311 (delta=-0.1274), RR=39.7% (delta=-10.3%), bets=178, hit=7.9%, features=43, time=1134.6s
+  -> NOT BENEFICIAL
+
+======================================================================
+TEST: 3. Class Transition Features (昇級/降級)
+======================================================================
+  PF=0.4506 (delta=-0.1079), RR=40.4% (delta=-9.7%), bets=194, hit=10.3%, features=42, time=1127.6s
+  -> NOT BENEFICIAL
+
+======================================================================
+TEST: 4. Trainer-Jockey Combo (調教師-騎手コンビ)
+======================================================================
+  PF=0.6741 (delta=+0.1157), RR=59.7% (delta=+9.6%), bets=192, hit=11.5%, features=42, time=1151.0s
+  -> BENEFICIAL
+
+======================================================================
+TEST: 5. Distance Aptitude Scoring (距離適性精密版)
+======================================================================
+  PF=0.5779 (delta=+0.0194), RR=51.5% (delta=+1.5%), bets=157, hit=10.8%, features=41, time=1100.2s
+  -> BENEFICIAL
+
+======================================================================
+TEST: 6. Weight Change Impact (斤量変化)
+======================================================================
+  PF=0.6211 (delta=+0.0626), RR=55.3% (delta=+5.3%), bets=165, hit=10.9%, features=42, time=803.4s
+  -> BENEFICIAL
+
+======================================================================
+TEST: 7. Rest Period Effect (放牧明け)
+======================================================================
+  PF=0.4918 (delta=-0.0666), RR=45.5% (delta=-4.6%), bets=212, hit=7.5%, features=45, time=795.9s
+  -> NOT BENEFICIAL
+
+======================================================================
+COMBINED TEST: 3 beneficial improvements together
+======================================================================
+  PF=0.5266 (delta=-0.0318), RR=47.0% (delta=-3.0%), bets=206, hit=10.7%, features=51, time=882.3s
+
+[Results] Saved to C:\Users\kawanoyuu\Desktop\FX-AI\research\keiba\keiba_improvement_results.txt
+======================================================================
+競馬予測モデル改善テスト結果
+日時: 2026-03-27 08:17
+======================================================================
+
+[注意] 合成データでの検証結果です。実データでは結果が異なります。
+
+--------------------------------------------------
+BASELINE (現行モデル v2.1)
+--------------------------------------------------
+  Profit Factor:  0.5585
+  Recovery Rate:  50.1%
+  Total Bets:     145
+  Hit Rate:       10.3%
+  Features:       37
+
+--------------------------------------------------
+TEST: 1. Track Condition Interactions (馬場状態 x 距離 x 脚質)
+--------------------------------------------------
+  Profit Factor:  0.4030 (delta=-0.1555)
+  Recovery Rate:  37.2% (delta=-12.9%)
+  Total Bets:     183
+  Hit Rate:       7.7%
+  Features:       42
+  Time:           1104.5s
+  Verdict:        NOT BENEFICIAL - SKIP
+
+--------------------------------------------------
+TEST: 2. Pace Prediction Features (ペース予測)
+--------------------------------------------------
+  Profit Factor:  0.4311 (delta=-0.1274)
+  Recovery Rate:  39.7% (delta=-10.3%)
+  Total Bets:     178
+  Hit Rate:       7.9%
+  Features:       43
+  Time:           1134.6s
+  Verdict:        NOT BENEFICIAL - SKIP
+
+--------------------------------------------------
+TEST: 3. Class Transition Features (昇級/降級)
+--------------------------------------------------
+  Profit Factor:  0.4506 (delta=-0.1079)
+  Recovery Rate:  40.4% (delta=-9.7%)
+  Total Bets:     194
+  Hit Rate:       10.3%
+  Features:       42
+  Time:           1127.6s
+  Verdict:        NOT BENEFICIAL - SKIP
+
+--------------------------------------------------
+TEST: 4. Trainer-Jockey Combo (調教師-騎手コンビ)
+--------------------------------------------------
+  Profit Factor:  0.6741 (delta=+0.1157)
+  Recovery Rate:  59.7% (delta=+9.6%)
+  Total Bets:     192
+  Hit Rate:       11.5%
+  Features:       42
+  Time:           1151.0s
+  Verdict:        BENEFICIAL - ADOPT
+
+--------------------------------------------------
+TEST: 5. Distance Aptitude Scoring (距離適性精密版)
+--------------------------------------------------
+  Profit Factor:  0.5779 (delta=+0.0194)
+  Recovery Rate:  51.5% (delta=+1.5%)
+  Total Bets:     157
+  Hit Rate:       10.8%
+  Features:       41
+  Time:           1100.2s
+  Verdict:        BENEFICIAL - ADOPT
+
+--------------------------------------------------
+TEST: 6. Weight Change Impact (斤量変化)
+--------------------------------------------------
+  Profit Factor:  0.6211 (delta=+0.0626)
+  Recovery Rate:  55.3% (delta=+5.3%)
+  Total Bets:     165
+  Hit Rate:       10.9%
+  Features:       42
+  Time:           803.4s
+  Verdict:        BENEFICIAL - ADOPT
+
+--------------------------------------------------
+TEST: 7. Rest Period Effect (放牧明け)
+--------------------------------------------------
+  Profit Factor:  0.4918 (delta=-0.0666)
+  Recovery Rate:  45.5% (delta=-4.6%)
+  Total Bets:     212
+  Hit Rate:       7.5%
+  Features:       45
+  Time:           795.9s
+  Verdict:        NOT BENEFICIAL - SKIP
+
+==================================================
+COMBINED (3 beneficial improvements)
+==================================================
+  + 4. Trainer-Jockey Combo (調教師-騎手コンビ)
+  + 5. Distance Aptitude Scoring (距離適性精密版)
+  + 6. Weight Change Impact (斤量変化)
+  Profit Factor:  0.5266 (delta=-0.0318)
+  Recovery Rate:  47.0% (delta=-3.0%)
+  Total Bets:     206
+  Hit Rate:       10.7%
+  Features:       51
+
+==================================================
+SUMMARY
+==================================================
+  Tested:     7 improvements
+  Beneficial: 3
+  Skipped:    4
+
+  Adopted improvements:
+    + 4. Trainer-Jockey Combo (調教師-騎手コンビ) (PF delta=+0.1157)
+    + 5. Distance Aptitude Scoring (距離適性精密版) (PF delta=+0.0194)
+    + 6. Weight Change Impact (斤量変化) (PF delta=+0.0626)
+
+======================================================================
+テスト完了
+======================================================================
