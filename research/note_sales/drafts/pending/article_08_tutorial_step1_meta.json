@@ -1,0 +1,50 @@
+{
+  "article_id": "article_08",
+  "title": "【第1回】Pythonを触ったことがない人がAI予測を動かすまでの全手順",
+  "platform": "note.com",
+  "type": "free",
+  "series": {
+    "name": "AI予測チュートリアル",
+    "episode": 1,
+    "total_planned": 3
+  },
+  "status": "pending_review",
+  "category": "tutorial",
+  "target_audience": "complete_beginners_zero_programming",
+  "target_length_chars": "4000-4500",
+  "actual_length_chars_approx": 4200,
+  "created_at": "2026-03-26",
+  "last_updated": "2026-03-26",
+  "author_persona": "個人開発エンジニア",
+  "tone": "超初心者向け、手取り足取り、コピペで動くことを強調、友達に教える感覚",
+  "purpose": "traffic_building",
+  "conversion_target": "シリーズ継続読者 → 有料記事への導線",
+  "technical_content": {
+    "language": "Python",
+    "libraries": ["pandas", "numpy", "scikit-learn", "lightgbm", "yfinance"],
+    "model": "LGBMClassifier",
+    "target_stock": "7203.T (トヨタ)",
+    "data_period": "2y",
+    "features": ["Return", "MA5", "MA20", "Vol"],
+    "train_test_split": "80/20",
+    "expected_accuracy_range": "52%-58%",
+    "code_lines": 15
+  },
+  "disclaimers_included": false,
+  "hashtags": [
+    "#Python",
+    "#AI",
+    "#初心者",
+    "#プログラミング",
+    "#機械学習",
+    "#株価予測",
+    "#チュートリアル"
+  ],
+  "related_articles": [
+    "article_07_beginner_what_is_ai"
+  ],
+  "next_articles_planned": [
+    "第2回: データを集める方法",
+    "第3回: 特徴量を増やして精度を上げる"
+  ]
+}

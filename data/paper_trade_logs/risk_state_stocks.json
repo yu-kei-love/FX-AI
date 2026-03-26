@@ -1,0 +1,39 @@
+{
+  "initial_balance": 1000000,
+  "account_balance": 1000000,
+  "peak_balance": 1000000,
+  "daily_pnl": 0.0,
+  "weekly_pnl": 0.0,
+  "losing_streak": 0,
+  "open_positions": {
+    "7203T": {
+      "direction": "long",
+      "entry_price": 3377.0,
+      "stop_loss_price": 3222.6539914763316,
+      "position_size": 129.58,
+      "opened_at": "2026-03-26T11:15:28.937346"
+    },
+    "9984T": {
+      "direction": "long",
+      "entry_price": 3979.0,
+      "stop_loss_price": 3621.6260174088206,
+      "position_size": 55.96,
+      "opened_at": "2026-03-26T11:15:43.165898"
+    },
+    "6758T": {
+      "direction": "short",
+      "entry_price": 3253.0,
+      "stop_loss_price": 3401.373011562993,
+      "position_size": 134.8,
+      "opened_at": "2026-03-26T11:15:59.081367"
+    }
+  },
+  "is_halted": false,
+  "current_date": "2026-03-26",
+  "week_start_date": "2026-03-23",
+  "risk_per_trade": 0.02,
+  "max_daily_loss": 0.05,
+  "max_weekly_loss": 0.1,
+  "max_drawdown": 0.15,
+  "max_positions": 3
+}

@@ -1,0 +1,41 @@
+{
+  "title": "【コード全公開】競艇AI予測モデルの作り方 — EV閾値最適化でPF+24%改善した全手順",
+  "price": 1980,
+  "currency": "JPY",
+  "status": "pending",
+  "type": "paid",
+  "created_at": "2026-03-26",
+  "tags": ["競艇AI", "ボートレース", "Python", "機械学習", "LightGBM", "コード公開"],
+  "free_preview_chars": 3500,
+  "paid_divider": "--- ここから有料 ---",
+  "estimated_chars": 7800,
+  "sections": {
+    "free": [
+      "導入・学べること一覧",
+      "最終成績サマリー",
+      "EV閾値の概念説明",
+      "改善前後比較",
+      "モデル全体像"
+    ],
+    "paid": [
+      "EV最適化テーブル全21段階(単勝/2連単/2連複)",
+      "Walk-Forward EV閾値探索コード",
+      "Kelly Criterion実装",
+      "2連単の条件付き確率計算",
+      "PF/Sharpe/MDD計算コード",
+      "5モデルアンサンブル構成",
+      "特徴量重要度ランキング全48特徴量",
+      "特徴量プルーニング判断基準と相関分析",
+      "パイプライン構築手順",
+      "ベットサイジング戦略",
+      "免責事項"
+    ]
+  },
+  "model_version": "v3.3 pruned",
+  "key_results": {
+    "win_pf": 2.91,
+    "exacta_pf": 3.241,
+    "quinella_pf": 3.208,
+    "pf_improvement_pct": 24
+  }
+}

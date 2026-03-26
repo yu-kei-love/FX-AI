@@ -1,0 +1,428 @@
+======================================================================
+FEATURE IMPORTANCE ANALYSIS REPORT
+Generated: 2026-03-26 15:43:21
+======================================================================
+
+----------------------------------------------------------------------
+MODEL 1: FX (USD/JPY)
+----------------------------------------------------------------------
+
+  FEATURE IMPORTANCE RANKING (gain-based):
+  Rank  Feature                             Importance   Pct(%)   Cumul(%)
+  --------------------------------------------------------------------
+  1     Regime_duration                     916          10.6     10.6    
+  2     Volatility_24                       843          9.7      20.3    
+  3     MA_75                               794          9.2      29.5    
+  4     BB_upper                            606          7.0      36.5    
+  5     MACD_signal                         570          6.6      43.0    
+  6     BB_lower                            556          6.4      49.5    
+  7     BB_width                            531          6.1      55.6    
+  8     MA_25                               468          5.4      61.0    
+  9     Return_24                           410          4.7      65.7    
+  10    MA_5                                387          4.5      70.2    
+  11    DayOfWeek                           386          4.5      74.7    
+  12    MACD                                380          4.4      79.0    
+  13    MACD_hist                           353          4.1      83.1    
+  14    Hour                                339          3.9      87.0    
+  15    RSI_14                              331          3.8      90.8    
+  16    Return_6                            294          3.4      94.2    
+  17    Return_3                            226          2.6      96.8    
+  18    Return_1                            170          2.0      98.8    
+  19    Regime                              99           1.1      100.0   
+  20    Regime_changed                      4            0.0      100.0   
+
+  WEAK FEATURES (bottom 10% by importance):
+    - Regime                              importance=99  (1.14%)
+    - Regime_changed                      importance=4  (0.05%)
+
+  HIGHLY CORRELATED FEATURE PAIRS (|r| > 0.95):
+    - BB_upper <-> MA_25  (r=0.9997)
+    - MA_5 <-> MA_25  (r=0.9997)
+    - BB_lower <-> MA_25  (r=0.9997)
+    - BB_lower <-> MA_5  (r=0.9996)
+    - BB_upper <-> MA_5  (r=0.9994)
+    - MA_25 <-> MA_75  (r=0.9994)
+    - BB_upper <-> MA_75  (r=0.9991)
+    - BB_upper <-> BB_lower  (r=0.9989)
+    - BB_lower <-> MA_75  (r=0.9988)
+    - MA_5 <-> MA_75  (r=0.9988)
+    - MACD <-> MACD_signal  (r=0.9548)
+
+----------------------------------------------------------------------
+MODEL 2: Japan Stock (Nikkei225)
+----------------------------------------------------------------------
+
+  FEATURE IMPORTANCE RANKING (gain-based):
+  Rank  Feature                             Importance   Pct(%)   Cumul(%)
+  --------------------------------------------------------------------
+  1     US_Finance_Return                   218          6.3      6.3     
+  2     Volume_Ratio                        184          5.3      11.7    
+  3     Target_Return_1d                    131          3.8      15.5    
+  4     DOW_Return_5d                       129          3.7      19.2    
+  5     VIX_Return_5d                       127          3.7      22.9    
+  6     Volume_Change                       126          3.7      26.6    
+  7     CorrMom_SP500_5d                    123          3.6      30.2    
+  8     Target_Return_20d                   120          3.5      33.6    
+  9     Target_Volatility_20d               120          3.5      37.1    
+  10    VIX_Change                          118          3.4      40.6    
+  11    US_Healthcare_Return                112          3.3      43.8    
+  12    TechFinance_Spread                  110          3.2      47.0    
+  13    CorrMom_NASDAQ_5d                   104          3.0      50.0    
+  14    VIX_of_VIX                          100          2.9      52.9    
+  15    VIXPct_x_Mom5d                      97           2.8      55.8    
+  16    SP500_Return_5d                     95           2.8      58.5    
+  17    RSI_Proxy_10d                       94           2.7      61.2    
+  18    VIX_Level                           93           2.7      63.9    
+  19    EnergyTech_Spread                   92           2.7      66.6    
+  20    Target_Return_5d                    91           2.6      69.3    
+  21    Cumulative_Return_10d               83           2.4      71.7    
+  22    CorrMom_DOW_5d                      81           2.4      74.0    
+  23    VIX_x_SP500                         81           2.4      76.4    
+  24    NASDAQ_Return_5d                    80           2.3      78.7    
+  25    TechFinance_Spread_5d               79           2.3      81.0    
+  26    US_Energy_Return                    72           2.1      83.1    
+  27    DOW_Return                          71           2.1      85.2    
+  28    US_Tech_Return                      70           2.0      87.2    
+  29    VIX_x_NASDAQ                        67           1.9      89.1    
+  30    Corr_SP500_20d                      64           1.9      91.0    
+  31    Corr_NASDAQ_20d                     59           1.7      92.7    
+  32    VIX_Percentile                      51           1.5      94.2    
+  33    Corr_DOW_20d                        51           1.5      95.7    
+  34    SP500_Return                        32           0.9      96.6    
+  35    Month                               30           0.9      97.5    
+  36    DayOfWeek                           28           0.8      98.3    
+  37    NASDAQ_Return                       27           0.8      99.1    
+  38    VIX_Regime                          18           0.5      99.6    
+  39    Cumulative_Return_5d                12           0.3      99.9    
+  40    IsMonday                            2            0.1      100.0   
+  41    VIX_High                            0            0.0      100.0   
+  42    IsFriday                            0            0.0      100.0   
+
+  WEAK FEATURES (bottom 10% by importance):
+    - Cumulative_Return_5d                importance=12  (0.35%)
+    - IsMonday                            importance=2  (0.06%)
+    - VIX_High                            importance=0  (0.00%)
+    - IsFriday                            importance=0  (0.00%)
+
+  HIGHLY CORRELATED FEATURE PAIRS (|r| > 0.95):
+    - Target_Return_5d <-> Cumulative_Return_5d  (r=1.0000)
+    - NASDAQ_Return <-> US_Tech_Return  (r=0.9938)
+    - VIX_x_SP500 <-> VIX_x_NASDAQ  (r=0.9833)
+    - Corr_SP500_20d <-> Corr_NASDAQ_20d  (r=0.9709)
+    - CorrMom_SP500_5d <-> CorrMom_NASDAQ_5d  (r=0.9674)
+    - SP500_Return <-> NASDAQ_Return  (r=0.9672)
+    - SP500_Return <-> US_Tech_Return  (r=0.9640)
+    - SP500_Return_5d <-> NASDAQ_Return_5d  (r=0.9596)
+
+----------------------------------------------------------------------
+MODEL 3: Boat Racing
+----------------------------------------------------------------------
+
+  FEATURE IMPORTANCE RANKING (gain-based):
+  Rank  Feature                             Importance   Pct(%)   Cumul(%)
+  --------------------------------------------------------------------
+  1     exhibition_time                     407          4.6      4.6     
+  2     weight_diff                         391          4.4      9.0     
+  3     boat_2place_rate                    384          4.3      13.4    
+  4     motor_vs_field_avg                  374          4.2      17.6    
+  5     place_consistency                   358          4.1      21.7    
+  6     local_vs_national                   347          3.9      25.6    
+  7     racer_weight                        340          3.9      29.5    
+  8     exhibition_start                    334          3.8      33.2    
+  9     win_rate_vs_field_avg               320          3.6      36.9    
+  10    wind_x_wave                         300          3.4      40.3    
+  11    wind_x_lane                         295          3.3      43.6    
+  12    class_x_motor                       290          3.3      46.9    
+  13    wave_height                         279          3.2      50.1    
+  14    racer_win_rate                      265          3.0      53.1    
+  15    combined_equipment                  263          3.0      56.0    
+  16    avg_start_timing                    257          2.9      58.9    
+  17    racer_local_win_rate                255          2.9      61.8    
+  18    field_strength_std                  251          2.8      64.7    
+  19    motor_2place_rate                   250          2.8      67.5    
+  20    class_dominance                     243          2.8      70.3    
+  21    start_x_class                       241          2.7      73.0    
+  22    lane_class_motor                    239          2.7      75.7    
+  23    weather_wind_speed                  195          2.2      77.9    
+  24    start_x_lane                        187          2.1      80.0    
+  25    class_x_lane                        182          2.1      82.1    
+  26    lane                                171          1.9      84.0    
+  27    racer_place_rate                    171          1.9      86.0    
+  28    field_strength                      168          1.9      87.9    
+  29    wind_dir_x_lane                     143          1.6      89.5    
+  30    racer_local_2place_rate             143          1.6      91.1    
+  31    racer_3place_rate                   113          1.3      92.4    
+  32    boat_rank                           89           1.0      93.4    
+  33    class_rank_in_race                  76           0.9      94.3    
+  34    equipment_rank                      73           0.8      95.1    
+  35    start_timing_rank                   70           0.8      95.9    
+  36    flying_count                        55           0.6      96.5    
+  37    win_rate_rank                       50           0.6      97.1    
+  38    motor_rank                          47           0.5      97.6    
+  39    weather_condition                   45           0.5      98.1    
+  40    lane_squared                        42           0.5      98.6    
+  41    course_type                         42           0.5      99.1    
+  42    flying_x_class                      41           0.5      99.5    
+  43    lane_x_race_number                  13           0.1      99.7    
+  44    racer_class                         11           0.1      99.8    
+  45    inner_class_advantage               11           0.1      99.9    
+  46    is_inner_lane                       7            0.1      100.0   
+  47    late_count                          0            0.0      100.0   
+  48    race_number                         0            0.0      100.0   
+
+  WEAK FEATURES (bottom 10% by importance):
+    - inner_class_advantage               importance=11  (0.12%)
+    - is_inner_lane                       importance=7  (0.08%)
+    - late_count                          importance=0  (0.00%)
+    - race_number                         importance=0  (0.00%)
+
+  HIGHLY CORRELATED FEATURE PAIRS (|r| > 0.95):
+    - lane <-> lane_x_race_number  (r=1.0000)
+    - racer_place_rate <-> racer_3place_rate  (r=1.0000)
+    - racer_local_win_rate <-> racer_local_2place_rate  (r=1.0000)
+    - lane <-> lane_squared  (r=0.9789)
+    - lane_squared <-> lane_x_race_number  (r=0.9789)
+    - racer_win_rate <-> racer_3place_rate  (r=0.9524)
+    - racer_win_rate <-> racer_place_rate  (r=0.9524)
+
+----------------------------------------------------------------------
+MODEL 4: Crypto (BTC)
+----------------------------------------------------------------------
+
+  FEATURE IMPORTANCE RANKING (gain-based):
+  Rank  Feature                             Importance   Pct(%)   Cumul(%)
+  --------------------------------------------------------------------
+  1     RSI_1d                              883          10.0     10.0    
+  2     MACD_4h                             625          7.1      17.1    
+  3     MACD_1d                             565          6.4      23.5    
+  4     ADX_4h                              368          4.2      27.7    
+  5     MACD_hist_4h                        346          3.9      31.6    
+  6     ADX_1d                              294          3.3      34.9    
+  7     BB_width_1d                         289          3.3      38.2    
+  8     BB_lower                            270          3.1      41.2    
+  9     ATR_1d                              251          2.8      44.1    
+  10    MACD_hist_1d                        249          2.8      46.9    
+  11    BB_width_4h                         235          2.7      49.6    
+  12    RSI_4h                              232          2.6      52.2    
+  13    ADX_14                              221          2.5      54.7    
+  14    ATR_14                              205          2.3      57.0    
+  15    BB_upper                            204          2.3      59.3    
+  16    Return_skew_12                      188          2.1      61.5    
+  17    realized_vol                        175          2.0      63.4    
+  18    MA_cross                            174          2.0      65.4    
+  19    ATR_4h                              172          1.9      67.4    
+  20    ma_ratio_50                         161          1.8      69.2    
+  21    garman_klass_vol                    155          1.8      70.9    
+  22    BB_width                            155          1.8      72.7    
+  23    dow_sin                             145          1.6      74.3    
+  24    hour_sin                            144          1.6      76.0    
+  25    MACD_signal                         135          1.5      77.5    
+  26    MACD                                130          1.5      79.0    
+  27    MFI                                 123          1.4      80.4    
+  28    hour_cos                            112          1.3      81.6    
+  29    RSI_x_Vol                           112          1.3      82.9    
+  30    buy_sell_volume_ratio               111          1.3      84.2    
+  31    MACD_hist                           107          1.2      85.4    
+  32    return_lag_24                       106          1.2      86.6    
+  33    RSI_14                              96           1.1      87.7    
+  34    CCI                                 92           1.0      88.7    
+  35    parkinson_vol                       92           1.0      89.7    
+  36    MACD_norm                           88           1.0      90.7    
+  37    ma_ratio_20                         70           0.8      91.5    
+  38    Momentum_accel                      70           0.8      92.3    
+  39    Stoch_D                             61           0.7      93.0    
+  40    dow_cos                             55           0.6      93.6    
+  41    ma_ratio_5                          54           0.6      94.2    
+  42    return_lag_6                        54           0.6      94.9    
+  43    Vol_change                          46           0.5      95.4    
+  44    BB_position                         44           0.5      95.9    
+  45    Stoch_K                             43           0.5      96.4    
+  46    ma_ratio_10                         42           0.5      96.8    
+  47    volume_ma_ratio                     37           0.4      97.3    
+  48    Close_position                      37           0.4      97.7    
+  49    return_lag_12                       35           0.4      98.1    
+  50    HL_ratio                            35           0.4      98.5    
+  51    OBV_pct                             33           0.4      98.8    
+  52    return_lag_2                        32           0.4      99.2    
+  53    return_lag_3                        31           0.4      99.6    
+  54    return_lag_1                        20           0.2      99.8    
+  55    Williams_R                          16           0.2      100.0   
+  56    volume_spike                        2            0.0      100.0   
+  57    fear_greed_index                    1            0.0      100.0   
+
+  WEAK FEATURES (bottom 10% by importance):
+    - return_lag_3                        importance=31  (0.35%)
+    - return_lag_1                        importance=20  (0.23%)
+    - Williams_R                          importance=16  (0.18%)
+    - volume_spike                        importance=2  (0.02%)
+    - fear_greed_index                    importance=1  (0.01%)
+
+  HIGHLY CORRELATED FEATURE PAIRS (|r| > 0.95):
+    - BB_upper <-> BB_lower  (r=0.9964)
+    - Stoch_K <-> Williams_R  (r=0.9944)
+    - parkinson_vol <-> garman_klass_vol  (r=0.9912)
+    - CCI <-> BB_position  (r=0.9753)
+    - MACD_signal <-> MA_cross  (r=0.9675)
+    - MACD <-> MACD_signal  (r=0.9533)
+    - return_lag_3 <-> ma_ratio_5  (r=0.9506)
+
+----------------------------------------------------------------------
+MODEL 5: Keiba (Horse Racing)
+----------------------------------------------------------------------
+
+  FEATURE IMPORTANCE RANKING (gain-based):
+  Rank  Feature                             Importance   Pct(%)   Cumul(%)
+  --------------------------------------------------------------------
+  1     last_3f                             804          9.0      9.0     
+  2     corner_position_4                   708          7.9      16.9    
+  3     last_3f_rank                        679          7.6      24.5    
+  4     jockey_win_rate                     650          7.3      31.8    
+  5     field_size                          539          6.0      37.9    
+  6     jockey_place_rate                   538          6.0      43.9    
+  7     odds                                488          5.5      49.4    
+  8     odds_vs_jockey                      462          5.2      54.5    
+  9     horse_weight                        460          5.2      59.7    
+  10    prev_last_3f                        413          4.6      64.3    
+  11    weight_change                       346          3.9      68.2    
+  12    distance                            329          3.7      71.9    
+  13    days_since_last                     325          3.6      75.5    
+  14    last3_avg_finish                    227          2.5      78.1    
+  15    popularity                          222          2.5      80.6    
+  16    horse_age                           219          2.5      83.0    
+  17    post_position                       212          2.4      85.4    
+  18    running_style                       202          2.3      87.6    
+  19    weight_carried                      165          1.8      89.5    
+  20    trainer_win_rate                    159          1.8      91.3    
+  21    class_x_age                         156          1.7      93.0    
+  22    last_finish                         130          1.5      94.5    
+  23    dist_aptitude                       103          1.2      95.6    
+  24    win_rate                            99           1.1      96.7    
+  25    place_rate                          80           0.9      97.6    
+  26    track_condition                     76           0.9      98.5    
+  27    track_aptitude                      64           0.7      99.2    
+  28    sex                                 49           0.5      99.8    
+  29    track_type                          14           0.2      99.9    
+  30    race_class                          8            0.1      100.0   
+  31    earnings_per_race                   0            0.0      100.0   
+  32    sire_encoded                        0            0.0      100.0   
+  33    bms_encoded                         0            0.0      100.0   
+  34    venue_aptitude                      0            0.0      100.0   
+
+  WEAK FEATURES (bottom 10% by importance):
+    - sire_encoded                        importance=0  (0.00%)
+    - bms_encoded                         importance=0  (0.00%)
+    - venue_aptitude                      importance=0  (0.00%)
+
+  HIGHLY CORRELATED FEATURE PAIRS (|r| > 0.95):
+    - jockey_win_rate <-> trainer_win_rate  (r=1.0000)
+    - odds <-> odds_vs_jockey  (r=0.9997)
+    - horse_weight <-> weight_carried  (r=0.9783)
+    - place_rate <-> track_aptitude  (r=0.9768)
+    - race_class <-> class_x_age  (r=0.9699)
+
+
+======================================================================
+SUMMARY & RECOMMENDATIONS
+======================================================================
+
+--- FX (USD/JPY) ---
+  Pruning candidates (near-zero importance): 2 features
+    PRUNE: Regime
+    PRUNE: Regime_changed
+  -> These features add noise without predictive power. Remove to reduce overfitting.
+  Redundant pairs (>0.95 correlation): 11 pairs
+    REDUNDANT: BB_upper vs MA_25 (r=0.9997)
+    REDUNDANT: MA_5 vs MA_25 (r=0.9997)
+    REDUNDANT: BB_lower vs MA_25 (r=0.9997)
+    REDUNDANT: BB_lower vs MA_5 (r=0.9996)
+    REDUNDANT: BB_upper vs MA_5 (r=0.9994)
+    REDUNDANT: MA_25 vs MA_75 (r=0.9994)
+    REDUNDANT: BB_upper vs MA_75 (r=0.9991)
+    REDUNDANT: BB_upper vs BB_lower (r=0.9989)
+    REDUNDANT: BB_lower vs MA_75 (r=0.9988)
+    REDUNDANT: MA_5 vs MA_75 (r=0.9988)
+    REDUNDANT: MACD vs MACD_signal (r=0.9548)
+  -> Keep the feature with higher importance from each pair, drop the other.
+
+--- Japan Stock (Nikkei225) ---
+  Pruning candidates (near-zero importance): 4 features
+    PRUNE: Cumulative_Return_5d
+    PRUNE: IsMonday
+    PRUNE: VIX_High
+    PRUNE: IsFriday
+  -> These features add noise without predictive power. Remove to reduce overfitting.
+  Redundant pairs (>0.95 correlation): 8 pairs
+    REDUNDANT: Target_Return_5d vs Cumulative_Return_5d (r=1.0000)
+    REDUNDANT: NASDAQ_Return vs US_Tech_Return (r=0.9938)
+    REDUNDANT: VIX_x_SP500 vs VIX_x_NASDAQ (r=0.9833)
+    REDUNDANT: Corr_SP500_20d vs Corr_NASDAQ_20d (r=0.9709)
+    REDUNDANT: CorrMom_SP500_5d vs CorrMom_NASDAQ_5d (r=0.9674)
+    REDUNDANT: SP500_Return vs NASDAQ_Return (r=0.9672)
+    REDUNDANT: SP500_Return vs US_Tech_Return (r=0.9640)
+    REDUNDANT: SP500_Return_5d vs NASDAQ_Return_5d (r=0.9596)
+  -> Keep the feature with higher importance from each pair, drop the other.
+
+--- Boat Racing ---
+  Pruning candidates (near-zero importance): 4 features
+    PRUNE: inner_class_advantage
+    PRUNE: is_inner_lane
+    PRUNE: late_count
+    PRUNE: race_number
+  -> These features add noise without predictive power. Remove to reduce overfitting.
+  Redundant pairs (>0.95 correlation): 7 pairs
+    REDUNDANT: lane vs lane_x_race_number (r=1.0000)
+    REDUNDANT: racer_place_rate vs racer_3place_rate (r=1.0000)
+    REDUNDANT: racer_local_win_rate vs racer_local_2place_rate (r=1.0000)
+    REDUNDANT: lane vs lane_squared (r=0.9789)
+    REDUNDANT: lane_squared vs lane_x_race_number (r=0.9789)
+    REDUNDANT: racer_win_rate vs racer_3place_rate (r=0.9524)
+    REDUNDANT: racer_win_rate vs racer_place_rate (r=0.9524)
+  -> Keep the feature with higher importance from each pair, drop the other.
+
+--- Crypto (BTC) ---
+  Pruning candidates (near-zero importance): 5 features
+    PRUNE: return_lag_3
+    PRUNE: return_lag_1
+    PRUNE: Williams_R
+    PRUNE: volume_spike
+    PRUNE: fear_greed_index
+  -> These features add noise without predictive power. Remove to reduce overfitting.
+  Redundant pairs (>0.95 correlation): 7 pairs
+    REDUNDANT: BB_upper vs BB_lower (r=0.9964)
+    REDUNDANT: Stoch_K vs Williams_R (r=0.9944)
+    REDUNDANT: parkinson_vol vs garman_klass_vol (r=0.9912)
+    REDUNDANT: CCI vs BB_position (r=0.9753)
+    REDUNDANT: MACD_signal vs MA_cross (r=0.9675)
+    REDUNDANT: MACD vs MACD_signal (r=0.9533)
+    REDUNDANT: return_lag_3 vs ma_ratio_5 (r=0.9506)
+  -> Keep the feature with higher importance from each pair, drop the other.
+
+--- Keiba (Horse Racing) ---
+  Pruning candidates (near-zero importance): 3 features
+    PRUNE: sire_encoded
+    PRUNE: bms_encoded
+    PRUNE: venue_aptitude
+  -> These features add noise without predictive power. Remove to reduce overfitting.
+  Redundant pairs (>0.95 correlation): 5 pairs
+    REDUNDANT: jockey_win_rate vs trainer_win_rate (r=1.0000)
+    REDUNDANT: odds vs odds_vs_jockey (r=0.9997)
+    REDUNDANT: horse_weight vs weight_carried (r=0.9783)
+    REDUNDANT: place_rate vs track_aptitude (r=0.9768)
+    REDUNDANT: race_class vs class_x_age (r=0.9699)
+  -> Keep the feature with higher importance from each pair, drop the other.
+
+======================================================================
+OVERALL RECOMMENDATIONS
+======================================================================
+
+1. IMMEDIATE ACTIONS:
+   - Remove features with near-zero importance (bottom 10%)
+   - For correlated pairs, keep the one with higher importance
+
+2. OVERFITTING RISK ASSESSMENT:
+   - Models with many low-importance features are most at risk
+   - High feature count relative to data size increases overfitting
+
+3. MONITORING:
+   - Re-run this analysis after feature pruning to verify improvement
+   - Compare Walk-Forward PF before/after pruning

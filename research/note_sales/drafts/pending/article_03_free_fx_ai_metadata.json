@@ -1,0 +1,45 @@
+{
+  "article_id": "article_03_free_fx_ai",
+  "title": "FX予測AIを5通貨ペアで検証したら、USD/JPYだけ勝てた理由",
+  "type": "free",
+  "platform": "note.com",
+  "status": "pending",
+  "created_date": "2026-03-26",
+  "language": "ja",
+  "estimated_characters": 3800,
+  "tags": [
+    "#FX",
+    "#AI予測",
+    "#USD/JPY",
+    "#機械学習",
+    "#自動売買",
+    "#Walk-Forward"
+  ],
+  "data_sources": [
+    "research/fx_multi_pair_results.txt",
+    "research/fx_time_filter_results.txt",
+    "research/fx_confidence_results.txt",
+    "research/fx_sl_tp_results.txt"
+  ],
+  "key_metrics": {
+    "usdjpy_pf": 1.51,
+    "usdjpy_winrate": "55.5%",
+    "usdjpy_sharpe": 13.73,
+    "time_filter_pf_improvement": "1.57 -> 1.66",
+    "sltp_optimal_winrate": "68.3%",
+    "sltp_optimal_sl": "2.5xATR",
+    "sltp_optimal_tp": "1.5xATR"
+  },
+  "sections": [
+    "hook",
+    "multi_pair_results_table",
+    "usdjpy_advantage_analysis",
+    "time_filter_discovery",
+    "sltp_optimization",
+    "honest_assessment",
+    "paid_article_teaser",
+    "disclaimer"
+  ],
+  "paid_article_reference": "article_03_paid_fx_ai",
+  "notes": "Free article sharing backtest results only. Paid article covers full code and optimization methodology."
+}

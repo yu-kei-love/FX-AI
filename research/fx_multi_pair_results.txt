@@ -1,0 +1,83 @@
+================================================================================
+  FX Multi-Pair Walk-Forward Backtest Results
+  Model: v3.2 Ensemble (5 models, n_est=500, lr=0.03)
+  Horizon: 12h | Confidence >= 0.6 | Agreement >= 4/5
+  WF Settings: min_train=4320h, test=720h, step=720h
+  Date: 2026-03-26 15:47
+================================================================================
+
+Pair        Trades  WinRate      PF   Sharpe    MDD%  Sortino     ExpVal
+--------------------------------------------------------------------------------
+USDJPY        3744    55.5%    1.51    13.73  20.54%    23.11  +0.000329
+EURUSD        4834    53.4%    1.14     4.35  56.55%     5.84  -0.000144
+GBPUSD        4204    56.1%    1.37    11.18  34.73%    16.43  +0.000078
+EURJPY        4823    53.6%    1.33     9.87  31.23%    15.88  +0.000067
+AUDJPY        3987    54.9%    1.43    12.13  26.25%    17.24  +0.000299
+--------------------------------------------------------------------------------
+
+Best PF:     USDJPY (PF=1.51)
+Best Sharpe: USDJPY (Sharpe=13.73)
+
+
+Detailed per-pair results:
+================================================================================
+
+USDJPY:
+  Data bars:      12249
+  WF folds:       11 (traded in 11)
+  Total trades:   3744
+  Win rate:       55.5%
+  Profit Factor:  1.5102
+  Sharpe Ratio:   13.7304
+  Max Drawdown:   20.54%
+  Sortino Ratio:  23.1145
+  Exp Value Net:  +0.000329
+  Payoff Ratio:   1.2079
+
+EURUSD:
+  Data bars:      12285
+  WF folds:       11 (traded in 11)
+  Total trades:   4834
+  Win rate:       53.4%
+  Profit Factor:  1.1389
+  Sharpe Ratio:   4.3460
+  Max Drawdown:   56.55%
+  Sortino Ratio:  5.8361
+  Exp Value Net:  -0.000144
+  Payoff Ratio:   0.9536
+
+GBPUSD:
+  Data bars:      12288
+  WF folds:       11 (traded in 11)
+  Total trades:   4204
+  Win rate:       56.1%
+  Profit Factor:  1.3738
+  Sharpe Ratio:   11.1805
+  Max Drawdown:   34.73%
+  Sortino Ratio:  16.4269
+  Exp Value Net:  +0.000078
+  Payoff Ratio:   1.0708
+
+EURJPY:
+  Data bars:      12295
+  WF folds:       11 (traded in 11)
+  Total trades:   4823
+  Win rate:       53.6%
+  Profit Factor:  1.3313
+  Sharpe Ratio:   9.8716
+  Max Drawdown:   31.23%
+  Sortino Ratio:  15.8837
+  Exp Value Net:  +0.000067
+  Payoff Ratio:   1.1509
+
+AUDJPY:
+  Data bars:      12297
+  WF folds:       11 (traded in 11)
+  Total trades:   3987
+  Win rate:       54.9%
+  Profit Factor:  1.4269
+  Sharpe Ratio:   12.1303
+  Max Drawdown:   26.25%
+  Sortino Ratio:  17.2400
+  Exp Value Net:  +0.000299
+  Payoff Ratio:   1.1705

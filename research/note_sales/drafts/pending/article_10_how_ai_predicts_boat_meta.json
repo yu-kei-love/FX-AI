@@ -1,0 +1,35 @@
+{
+  "article_id": "article_10",
+  "title": "競艇AIは何を見て予測しているのか？ — 予測の裏側を全部見せます",
+  "subtitle": "AIの予測メカニズムを5ステップで完全解説",
+  "platform": "note.com",
+  "type": "free",
+  "price": 0,
+  "category": "テクノロジー",
+  "target_audience": "競艇初心者、AI予測に興味がある人、仕組みを知りたい人",
+  "tags": [
+    "競艇AI",
+    "ボートレース",
+    "AI予測",
+    "機械学習",
+    "初心者向け",
+    "AI仕組み",
+    "わかりやすい解説"
+  ],
+  "series": "AI予測シリーズ",
+  "article_number_in_series": 10,
+  "estimated_chars": 4200,
+  "status": "pending",
+  "created_date": "2026-03-26",
+  "source_data": {
+    "model_file": "research/boat/boat_model.py",
+    "feature_importance": "research/feature_importance_report.txt",
+    "model_type": "5-model ensemble (LightGBM + XGBoost + CatBoost + RandomForest + ExtraTrees)",
+    "num_features": 48,
+    "top_feature": "exhibition_time (rank 1, importance 407, 4.6%)",
+    "racer_win_rate_rank": "14th (importance 265, 3.0%)",
+    "key_insight": "展示タイム（当日のモーター調子）が全国勝率（通算成績）より遥かに重要"
+  },
+  "content_summary": "競艇AIが予測を行う5つのステップ（データ収集→パターン学習→確率計算→期待値判定→成績評価）を、専門知識ゼロの読者向けに日常的な比喩で解説。特徴量重要度データから「展示タイムが全国勝率より重要」という発見を紹介。",
+  "notes": "FREE記事。有料記事への導線として、次回は実際のコードを見せる予告で締め。"
+}

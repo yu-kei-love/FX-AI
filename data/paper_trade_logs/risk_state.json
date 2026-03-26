@@ -1,0 +1,25 @@
+{
+  "initial_balance": 1000000,
+  "account_balance": 946308.5800367426,
+  "peak_balance": 1000000,
+  "daily_pnl": 1308.58003674267,
+  "weekly_pnl": -53691.419963257336,
+  "losing_streak": 0,
+  "open_positions": {
+    "USDJPY": {
+      "direction": "short",
+      "entry_price": 159.34300231933594,
+      "stop_loss_price": 159.54829676561596,
+      "position_size": 92190.37,
+      "opened_at": "2026-03-26T16:05:29.950723"
+    }
+  },
+  "is_halted": false,
+  "current_date": "2026-03-26",
+  "week_start_date": "2026-03-23",
+  "risk_per_trade": 0.02,
+  "max_daily_loss": 0.05,
+  "max_weekly_loss": 0.1,
+  "max_drawdown": 0.15,
+  "max_positions": 3
+}

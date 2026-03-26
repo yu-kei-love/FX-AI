@@ -1,0 +1,48 @@
+{
+  "article_id": "article_07",
+  "title": "【完全初心者向け】AIで投資予測ってどういうこと？5分でわかる仕組み",
+  "platform": "note.com",
+  "type": "free",
+  "status": "pending_review",
+  "category": "beginner_intro",
+  "target_length_chars": "3000-3500",
+  "actual_length_chars_approx": 3200,
+  "created_at": "2026-03-26",
+  "last_updated": "2026-03-26",
+  "author_persona": "個人開発エンジニア",
+  "tone": "超初心者向け、親しみやすい一人称（僕）、専門用語ゼロ、祖父母に説明する感覚",
+  "purpose": "traffic_building_entry_point",
+  "conversion_target": "noteフォロー、他の無料記事への誘導",
+  "target_audience": "AI・投資の知識がまったくない完全初心者",
+  "key_points": [
+    "AIは過去のパターンから未来を予想する計算機",
+    "天気予報と同じ考え方",
+    "6市場を5つのAIの多数決で予測",
+    "過去データの検証結果を正直に公開",
+    "AIにできないことも明記",
+    "当たりもハズレも毎日公開していく"
+  ],
+  "metrics_cited": {
+    "stock_accuracy": "68%",
+    "boat_pf": "約3倍リターン（シミュレーション）",
+    "fx_accuracy": "55%（積み重ね型）"
+  },
+  "disclaimers_included": true,
+  "backtest_warning_included": true,
+  "hashtags": [
+    "#AI",
+    "#投資",
+    "#初心者",
+    "#わかりやすい",
+    "#機械学習",
+    "#株",
+    "#FX",
+    "#競艇"
+  ],
+  "next_article_teaser": "各市場（株・FX・競艇など）の予測詳細",
+  "related_articles": [
+    "article_01_free_boat_ai",
+    "article_02_free_stock_ai",
+    "article_03_free_fx_ai"
+  ]
+}

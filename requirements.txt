@@ -1,0 +1,43 @@
+# FX AI 自動売買システム - 依存ライブラリ
+# python 3.11.9
+
+# データ取得・処理
+pandas>=2.1
+numpy>=1.24
+yfinance>=0.2
+requests>=2.31
+python-dotenv>=1.0
+beautifulsoup4>=4.12
+aiohttp>=3.9
+
+# 機械学習
+lightgbm>=4.0
+xgboost>=2.0
+catboost>=1.2
+scikit-learn>=1.3
+hmmlearn>=0.3
+optuna>=3.4
+
+# ディープラーニング (Crypto LSTM/TFT)
+torch>=2.0
+
+# 強化学習
+gymnasium>=0.29
+stable-baselines3>=2.1
+
+# 実験管理
+mlflow>=2.9
+joblib>=1.3
+
+# ダッシュボード・可視化
+streamlit>=1.28
+plotly>=5.18
+
+# コンテンツ生成
+anthropic>=0.18
+
+# Telegram通知
+python-telegram-bot>=20.0
+
+# スケジューラ
+schedule>=1.2

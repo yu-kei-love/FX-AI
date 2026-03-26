@@ -1,0 +1,63 @@
+======================================================================
+Volatility Regime Filter Analysis (Walk-Forward)
+======================================================================
+
+==================================================
+Pair: USDJPY
+==================================================
+Data: 11853 rows
+
+--- Vol Regime Bucket Analysis ---
+      <10%: PF=0.94, WinRate=48.3%, Trades=385, ExpVal=-0.000397
+    10-20%: PF=1.46, WinRate=50.8%, Trades=246, ExpVal=+0.000223
+    20-40%: PF=1.62, WinRate=58.2%, Trades=512, ExpVal=+0.000540
+    40-60%: PF=1.34, WinRate=54.3%, Trades=510, ExpVal=+0.000091
+    60-80%: PF=1.61, WinRate=59.5%, Trades=425, ExpVal=+0.000298
+    80-90%: PF=2.43, WinRate=66.1%, Trades=224, ExpVal=+0.001390
+      >90%: PF=1.78, WinRate=65.6%, Trades=279, ExpVal=+0.000490
+
+--- Baseline ---
+  PF=1.50, Sharpe=13.37, WinRate=57.0%, Trades=2581, ExpVal=+0.000310
+
+--- Vol Filter Comparisons ---
+  Skip low vol (<10pct): PF=1.64, Sharpe=16.29, WinRate=58.5%, Trades=2196, ExpVal=+0.000434
+  Skip low vol (<15pct): PF=1.67, Sharpe=16.86, WinRate=58.9%, Trades=2080, ExpVal=+0.000463
+  Skip low vol (<20pct): PF=1.66, Sharpe=16.64, WinRate=59.4%, Trades=1950, ExpVal=+0.000460
+  Skip low vol (<25pct): PF=1.69, Sharpe=17.20, WinRate=59.6%, Trades=1853, ExpVal=+0.000475
+  Skip extreme vol (>90pct): PF=1.47, Sharpe=12.81, WinRate=55.9%, Trades=2304, ExpVal=+0.000287
+  Skip both (<15pct, >90pct): PF=1.66, Sharpe=16.65, WinRate=57.9%, Trades=1803, ExpVal=+0.000458
+  Skip both (<20pct, >90pct): PF=1.64, Sharpe=16.38, WinRate=58.4%, Trades=1673, ExpVal=+0.000454
+  Only moderate vol (20-80pct): PF=1.52, Sharpe=14.07, WinRate=57.2%, Trades=1449, ExpVal=+0.000311
+
+  RECOMMENDATION: Apply 'Skip low vol (<25pct)'
+    min_vol_pct=0.25, max_vol_pct=None
+
+==================================================
+Pair: AUDJPY
+==================================================
+Data: 11842 rows
+
+--- Vol Regime Bucket Analysis ---
+      <10%: PF=1.06, WinRate=49.8%, Trades=329, ExpVal=-0.000208
+    10-20%: PF=1.11, WinRate=51.7%, Trades=300, ExpVal=-0.000154
+    20-40%: PF=1.77, WinRate=57.1%, Trades=511, ExpVal=+0.000572
+    40-60%: PF=1.79, WinRate=58.4%, Trades=406, ExpVal=+0.000599
+    60-80%: PF=2.39, WinRate=61.9%, Trades=494, ExpVal=+0.001077
+    80-90%: PF=3.02, WinRate=68.9%, Trades=183, ExpVal=+0.001377
+      >90%: PF=0.89, WinRate=54.9%, Trades=226, ExpVal=-0.000559
+
+--- Baseline ---
+  PF=1.58, Sharpe=15.17, WinRate=57.3%, Trades=2449, ExpVal=+0.000440
+
+--- Vol Filter Comparisons ---
+  Skip low vol (<10pct): PF=1.67, Sharpe=17.11, WinRate=58.5%, Trades=2120, ExpVal=+0.000541
+  Skip low vol (<15pct): PF=1.72, Sharpe=17.94, WinRate=58.8%, Trades=1962, ExpVal=+0.000593
+  Skip low vol (<20pct): PF=1.78, Sharpe=18.93, WinRate=59.6%, Trades=1820, ExpVal=+0.000655
+  Skip low vol (<25pct): PF=1.75, Sharpe=18.41, WinRate=59.7%, Trades=1702, ExpVal=+0.000638
+  Skip extreme vol (>90pct): PF=1.72, Sharpe=18.92, WinRate=57.6%, Trades=2231, ExpVal=+0.000543
+  Skip both (<15pct, >90pct): PF=1.97, Sharpe=23.46, WinRate=59.4%, Trades=1744, ExpVal=+0.000744
+  Skip both (<20pct, >90pct): PF=2.07, Sharpe=25.16, WinRate=60.4%, Trades=1602, ExpVal=+0.000828
+  Only moderate vol (20-80pct): PF=1.97, Sharpe=23.30, WinRate=59.2%, Trades=1413, ExpVal=+0.000756
+
+  RECOMMENDATION: Apply 'Skip both (<20pct, >90pct)'
+    min_vol_pct=0.2, max_vol_pct=0.9

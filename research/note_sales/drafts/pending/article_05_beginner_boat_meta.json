@@ -1,0 +1,43 @@
+{
+  "article_id": "article_05",
+  "title": "プログラミング未経験でもわかる！AIが競艇を予測する仕組み",
+  "platform": "note.com",
+  "type": "free",
+  "status": "pending_review",
+  "category": "boat_racing",
+  "target_audience": "complete_beginners",
+  "target_length_chars": "3500-4000",
+  "actual_length_chars_approx": 3750,
+  "created_at": "2026-03-26",
+  "last_updated": "2026-03-26",
+  "author_persona": "個人開発エンジニア",
+  "tone": "超初心者向け、友達に話すようなカジュアルな一人称（僕）、専門用語ゼロ",
+  "purpose": "traffic_building",
+  "conversion_target": "article_01（技術寄り無料記事）→ article_04（有料記事）への導線",
+  "key_metrics_cited": {
+    "win_return_per_1000": 2910,
+    "exacta_return_per_1000": 3070,
+    "quinella_return_per_1000": 2960,
+    "n_features": 48
+  },
+  "comparisons_cited": {
+    "lottery_return_per_1000": 460,
+    "pachinko_return_per_1000": 850
+  },
+  "disclaimers_included": true,
+  "backtest_warning_included": true,
+  "no_guarantee_warning": true,
+  "hashtags": [
+    "#競艇",
+    "#ボートレース",
+    "#AI",
+    "#初心者",
+    "#予測",
+    "#わかりやすい"
+  ],
+  "related_articles": [
+    "article_01_free_boat_ai",
+    "article_04_paid_boat_ev"
+  ],
+  "next_article_teaser": "技術的な詳細（アルゴリズム、特徴量設計）を別記事で解説"
+}

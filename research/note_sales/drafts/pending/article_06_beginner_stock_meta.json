@@ -1,0 +1,58 @@
+{
+  "article_id": "article_06",
+  "type": "free",
+  "platform": "note.com",
+  "title": "AIに日経平均の予測をさせてみたら、人間よりも冷静だった",
+  "slug": "ai-nikkei-prediction-calmer-than-human",
+  "status": "draft",
+  "created_at": "2026-03-26",
+  "updated_at": "2026-03-26",
+  "estimated_chars": 3700,
+  "language": "ja",
+  "tags": [
+    "株式投資",
+    "AI",
+    "日経平均",
+    "初心者",
+    "投資初心者",
+    "機械学習"
+  ],
+  "purpose": "traffic_building",
+  "target_audience": "株はやってるけどAIは全く知らない人、投資初心者",
+  "hook": "暴落の日、僕はパニック売りした。でもAIは冷静に「買い」と言っていた",
+  "tone": "conversational_beginner_friendly",
+  "key_metrics": {
+    "nikkei225_overall": {
+      "profit_factor": 2.13,
+      "win_rate": 0.68,
+      "trade_count": 122
+    }
+  },
+  "structure": [
+    "hook_panic_selling_story",
+    "human_vs_ai_comparison",
+    "how_ai_predicts_simplified",
+    "actual_results_honest",
+    "ai_is_not_magic",
+    "can_anyone_do_it",
+    "summary_and_cta"
+  ],
+  "formatting_rules": {
+    "no_markdown_bold": true,
+    "category_headers": "〈〉brackets",
+    "jargon_explained_inline": true
+  },
+  "related_articles": {
+    "technical_version": "article_02_free_stock_ai",
+    "planned_paid_followup": "article_07_paid_stock_ai_code (planned)"
+  },
+  "cta": "有料記事でPythonコード付きのAI構築方法を解説予定",
+  "disclaimer": true,
+  "seo_keywords": [
+    "AI 株 予測",
+    "日経平均 AI",
+    "株 初心者 AI",
+    "AI投資 始め方",
+    "株価予測 AI 初心者"
+  ]
+}

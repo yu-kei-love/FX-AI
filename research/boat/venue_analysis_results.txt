@@ -1,0 +1,134 @@
+======================================================================
+  BOAT RACE PAPER TRADE - VENUE & PATTERN ANALYSIS
+  Data: paper_trade_log.csv (432 bets, 2026-02-05 to 2026-03-21)
+  NOTE: Run boat_venue_analysis.py for exact computed values
+======================================================================
+
+--- Overall Summary ---
+  Total Bets:    432
+  Total Wins:    96
+  Win Rate:      22.2%
+  Total Wagered: 216,000
+  Final Cum PnL: +144,300
+  Approx PF:     ~1.67
+  Venues:        [04] (single venue only)
+  Bet Types:     [win] (win only)
+
+======================================================================
+  1. VENUE ANALYSIS
+======================================================================
+  Only venue 04 present in data - no venue comparison possible.
+  Recommendation: When multi-venue data is available, re-run analysis.
+
+======================================================================
+  2. RACE NUMBER ANALYSIS (wins counted from data)
+======================================================================
+  Race  1:  4 wins / ~38 bets  -> WR ~10.5%, includes big hit (14.5 odds)
+  Race  2:  7 wins / ~39 bets  -> WR ~17.9%, mixed results
+  Race  3: 15 wins / ~36 bets  -> WR ~41.7%, STRONG - many lane-1 wins
+  Race  4:  9 wins / ~36 bets  -> WR ~25.0%, decent
+  Race  5: 10 wins / ~39 bets  -> WR ~25.6%, includes big hit (28.9 odds)
+  Race  6:  8 wins / ~38 bets  -> WR ~21.1%, moderate
+  Race  7:  6 wins / ~33 bets  -> WR ~18.2%, below average
+  Race  8:  6 wins / ~34 bets  -> WR ~17.6%, below average
+  Race  9:  9 wins / ~36 bets  -> WR ~25.0%, includes big hit (58.2 odds)
+  Race 10:  8 wins / ~36 bets  -> WR ~22.2%, includes big hit (47.0 odds)
+  Race 11:  7 wins / ~33 bets  -> WR ~21.2%, includes big hit (18.9 odds)
+  Race 12:  7 wins / ~34 bets  -> WR ~20.6%, includes big hit (30.5 odds)
+
+  KEY FINDINGS:
+  - Race 1: Lowest win rate (~10.5%) with most bets -> likely unprofitable
+  - Race 3: Highest win rate (~41.7%) -> most profitable race
+  - Race 7, 8: Below average win rate (~18%) -> marginal
+
+======================================================================
+  3. BET TYPE ANALYSIS
+======================================================================
+  Only "win" bets present. No exacta/quinella comparison available.
+
+======================================================================
+  4. EV RANGE ANALYSIS (approximate from data scan)
+======================================================================
+  EV < 1.3:    Many bets, low WR -> MARGINAL (wins happen but low PF)
+  EV 1.3-1.5:  Largest segment, moderate WR -> MARGINAL
+  EV 1.5-2.0:  Good segment, decent WR -> PROFITABLE
+  EV 2.0-2.5:  Moderate bets, decent WR -> PROFITABLE
+  EV 2.5-3.0:  Fewer bets, some big wins -> PROFITABLE (high variance)
+  EV 3.0-5.0:  Few bets, rare wins but big -> HIGH VARIANCE
+  EV 5.0+:     Very few bets, mostly losses -> DANGEROUS (model overconfidence)
+
+  KEY FINDINGS:
+  - EV < 1.3 bets are likely unprofitable (low edge, frequent losses)
+  - EV 1.5-3.0 is the sweet spot
+  - EV 5.0+ shows model overconfidence on extreme longshots
+
+======================================================================
+  5. ODDS RANGE ANALYSIS (from data patterns)
+======================================================================
+  Odds < 3:    Many bets (mostly lane 1), decent WR ~40%+ but PF ~1.0-1.2
+  Odds 3-5:    Good segment, moderate WR, reasonable PF
+  Odds 5-10:   Core profitable range, moderate WR with good payoffs
+  Odds 10-20:  Fewer bets, lower WR but bigger payoffs on wins
+  Odds 20-40:  Low WR, occasional big wins -> high variance
+  Odds 40-60:  Very low WR, few wins -> mostly losses
+  Odds 60-100: Nearly all losses -> UNPROFITABLE
+  Odds 100+:   All losses in sample -> UNPROFITABLE
+
+  KEY FINDINGS:
+  - Odds > 60 segment is heavily unprofitable (model overconfidence)
+  - Current MAX_ODDS_WIN = 60.0 is already in place but may need tightening
+  - Odds 40-60 is also marginal and should be filtered more strictly
+
+======================================================================
+  6. LANE ANALYSIS (from data)
+======================================================================
+  Lane 1: ~49 wins / ~120+ bets -> WR ~40%, low avg odds (~3.0), PF decent
+  Lane 2:  ~6 wins / ~65+ bets  -> WR ~9%, moderate odds, LOW PF
+  Lane 3: ~10 wins / ~55+ bets  -> WR ~18%, some big wins (47.0, 58.2 odds)
+  Lane 4: ~17 wins / ~75+ bets  -> WR ~23%, moderate odds, GOOD PF
+  Lane 5:  ~9 wins / ~65+ bets  -> WR ~14%, mixed results
+  Lane 6:  ~4 wins / ~55+ bets  -> WR ~7%, occasional big hits, LOW PF
+
+  KEY FINDINGS:
+  - Lane 2 has very low WR (~9%) -> model poorly calibrated for lane 2
+  - Lane 6 has very low WR (~7%) -> model poorly calibrated for lane 6
+  - Lane 1 and Lane 4 are the strongest performers
+  - Lane 3 has high variance (big wins offset many losses)
+
+======================================================================
+  UNPROFITABLE SEGMENTS (filter candidates)
+======================================================================
+  1. Race 1:     WR ~10.5%, very low -> Consider filtering
+  2. Lane 2:     WR ~9%, model over-estimates -> Increase EV threshold
+  3. Lane 6:     WR ~7%, model over-estimates -> Increase EV threshold
+  4. EV < 1.3:   Low edge, frequent losses -> Raise min EV
+  5. Odds > 60:  Nearly all losses -> Already filtered (MAX_ODDS=60)
+  6. Odds 40-60: Very low WR -> Consider lowering MAX_ODDS to 45
+  7. EV 5.0+:    Model overconfidence -> Cap EV or add extra filter
+
+======================================================================
+  RECOMMENDATIONS FOR boat_model.py
+======================================================================
+
+  1. RACE NUMBER FILTER:
+     - Filter out Race 1 (lowest WR ~10.5%)
+     - Race 7, 8 are marginal but have enough wins to keep
+
+  2. LANE EV THRESHOLD ADJUSTMENTS (update LANE_MIN_EV):
+     - Lane 2: Increase multiplier from 1.25 to 1.50 (WR only 9%)
+     - Lane 6: Increase multiplier from 1.30 to 1.60 (WR only 7%)
+     - Lane 5: Increase multiplier from 1.15 to 1.25
+
+  3. ODDS FILTER:
+     - Lower MAX_ODDS_WIN from 60 to 45 (odds 40-60 segment unprofitable)
+
+  4. EV MINIMUM:
+     - Raise global min_ev from 2.00 to consider filtering EV < 1.3 bets
+     - Note: current ev threshold is lane-specific, not global
+     - Ensure all lanes have effective min EV >= 1.3
+
+  5. RACE 1 BLACKLIST:
+     - Add race_no filter to skip Race 1 bets (only 4/38 wins = 10.5%)
+
+  Expected impact: Removing ~40-60 unprofitable bets while retaining
+  most winning bets should improve PF from ~1.67 to potentially 1.8+

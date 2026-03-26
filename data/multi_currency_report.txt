@@ -1,0 +1,45 @@
+======================================================================
+MULTI-CURRENCY ANALYSIS REPORT
+Generated: 2026-03-24 05:22
+======================================================================
+
+Model: 5-Model Ensemble (LightGBM, XGBoost, CatBoost, RF, ExtraTrees)
+Validation: Walk-Forward (4320 train / 720 test)
+Features: Technical + US Rate + COT Positions + Commodity (where applicable)
+
+----------------------------------------------------------------------
+    Pair     PF   Win%     Exp(net)  Trades  Conf Agree     Status
+----------------------------------------------------------------------
+  usdjpy   1.47  52.9%    +0.000065     244  0.70     5 *** PROFIT
+  cadjpy   1.45  54.8%    +0.000112     210  0.75     3 *** PROFIT
+  eurjpy   1.16  49.2%    -0.000155     197  0.75     5       LOSS
+  gbpjpy   0.90  44.3%    -0.000405     176  0.75     3       LOSS
+  eurusd   0.79  47.5%    -0.000474    3585  0.60     4       LOSS
+  audjpy   0.79  44.9%    -0.000621    1050  0.70     3       LOSS
+  nzdjpy   0.68  41.6%    -0.000728    2004  0.60     5       LOSS
+  gbpusd   0.63  40.3%    -0.000678    1075  0.65     5       LOSS
+----------------------------------------------------------------------
+
+=== SUMMARY ===
+Total pairs tested: 8
+Profitable pairs: 2
+Paper trade candidates: usdjpy, cadjpy
+
+=== PROFIT ESTIMATES (100万円, leverage 25x) ===
+
+  USDJPY: ドル円（現行モデル）
+    PF=1.47, Monthly trades ~17
+    Monthly profit: +28,321 yen
+    Annual profit:  +339,857 yen
+    Annual ROI:     +34.0%
+
+  CADJPY: カナダドル円（原油連動）
+    PF=1.45, Monthly trades ~15
+    Monthly profit: +41,881 yen
+    Annual profit:  +502,567 yen
+    Annual ROI:     +50.3%
+
+=== IMPORTANT ===
+- All results are BACKTEST estimates. Real trading may differ.
+- Paper trade for 200+ trades before real money.
+- Past performance does not guarantee future results.

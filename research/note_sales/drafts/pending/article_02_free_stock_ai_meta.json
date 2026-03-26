@@ -1,0 +1,66 @@
+{
+  "article_id": "article_02",
+  "type": "free",
+  "platform": "note.com",
+  "title": "AIで日経225を予測したら勝率68%だった話【Walk-Forward検証】",
+  "slug": "ai-nikkei225-prediction-68percent-winrate",
+  "status": "draft",
+  "created_at": "2026-03-26",
+  "updated_at": "2026-03-26",
+  "estimated_chars": 4000,
+  "language": "ja",
+  "tags": [
+    "AI予測",
+    "日経225",
+    "株価予測",
+    "機械学習",
+    "LightGBM",
+    "Walk-Forward"
+  ],
+  "purpose": "traffic_building",
+  "target_audience": "個人投資家、AI/機械学習に興味がある人",
+  "hook": "AIで株価予測って本当にできるの？という疑問に実データで回答",
+  "key_metrics": {
+    "nikkei225_overall": {
+      "profit_factor": 2.13,
+      "sharpe_ratio": 4.81,
+      "sharpe_adjusted": "~2.0",
+      "win_rate": 0.68,
+      "trade_count": 122
+    },
+    "top_stocks": {
+      "advantest": {"pf": 2.04, "win_rate": 0.671, "trades": 143},
+      "softbank": {"pf": 1.82},
+      "shin_etsu": {"pf": 1.64}
+    },
+    "fx_comparison": {
+      "usdjpy": {"pf": 1.51, "win_rate": 0.555},
+      "audjpy": {"pf": 1.43, "win_rate": 0.549},
+      "gbpusd": {"pf": 1.37, "win_rate": 0.561}
+    }
+  },
+  "model_details": {
+    "ensemble_size": 5,
+    "models": ["LightGBM", "XGBoost", "CatBoost", "RandomForest", "ExtraTrees"],
+    "feature_count": 44,
+    "target_stocks": 14,
+    "walk_forward": {
+      "train_days": 252,
+      "test_days": 63,
+      "method": "expanding_window"
+    },
+    "confidence_threshold": 0.60,
+    "agreement_threshold": "5/5"
+  },
+  "related_paid_article": "article_02_paid (planned)",
+  "cta": "有料記事で特徴量詳細・コード全文を公開予定",
+  "disclaimer": true,
+  "seo_keywords": [
+    "AI 株価予測",
+    "日経225 予測",
+    "機械学習 株",
+    "Walk-Forward 検証",
+    "LightGBM 株式",
+    "アンサンブル学習 投資"
+  ]
+}

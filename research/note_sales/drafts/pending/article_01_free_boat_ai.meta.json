@@ -1,0 +1,67 @@
+{
+  "article_id": "article_01",
+  "title": "機械学習で競艇予測AIを作ってみた【PF2.9達成】",
+  "platform": "note.com",
+  "type": "free",
+  "status": "pending_review",
+  "category": "boat_racing",
+  "target_length_chars": "3500-4000",
+  "actual_length_chars_approx": 3800,
+  "created_at": "2026-03-26",
+  "last_updated": "2026-03-26",
+  "author_persona": "個人開発エンジニア",
+  "tone": "親しみやすい一人称（僕）、専門用語に説明付き",
+  "purpose": "traffic_building",
+  "conversion_target": "有料記事（EV最適化詳細、特徴量設計詳細）",
+  "key_metrics_cited": {
+    "win_pf": 2.91,
+    "win_bets": 822,
+    "win_hit_rate": "17.2%",
+    "win_recovery": "258.3%",
+    "win_sharpe": 6.67,
+    "exacta_pf": 3.24,
+    "exacta_bets": 711,
+    "exacta_hit_rate": "7.4%",
+    "exacta_recovery": "307.4%",
+    "quinella_pf": 3.21,
+    "quinella_bets": 1278,
+    "quinella_hit_rate": "11.1%",
+    "quinella_recovery": "296.3%"
+  },
+  "model_details": {
+    "ensemble": ["LightGBM", "XGBoost", "CatBoost", "RandomForest", "ExtraTrees"],
+    "weights": {"lgb": 0.25, "xgb": 0.25, "cat": 0.20, "rf": 0.15, "et": 0.15},
+    "n_features": 48,
+    "validation": "Walk-Forward (5 expanding windows)",
+    "ev_thresholds_optimized": {
+      "win": 2.00,
+      "exacta": 1.95,
+      "quinella": 2.00
+    }
+  },
+  "data_sources": [
+    "research/boat/boat_model.py",
+    "research/boat_ev_optimization_results.txt",
+    "research/feature_importance_report.txt"
+  ],
+  "hashtags": [
+    "#競艇AI",
+    "#ボートレース",
+    "#機械学習",
+    "#LightGBM",
+    "#AI予測",
+    "#Python",
+    "#データサイエンス",
+    "#アンサンブル学習",
+    "#期待値",
+    "#Walk-Forward"
+  ],
+  "disclaimers_included": true,
+  "backtest_warning_included": true,
+  "next_article_teaser": [
+    "EV閾値の最適化手法詳細",
+    "特徴量設計の詳細",
+    "Fractional Kellyベットサイジング",
+    "実運用データパイプライン"
+  ]
+}

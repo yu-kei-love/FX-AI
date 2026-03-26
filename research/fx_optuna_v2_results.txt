@@ -1,0 +1,64 @@
+============================================================
+fx_optuna_v2 - Optuna Re-optimization Results
+Date: 2026-03-27 02:52:50
+============================================================
+
+SEARCH SPACE (4 parameters only):
+  n_estimators:      [100, 400] step=50
+  learning_rate:     [0.01, 0.1] (log scale)
+  max_depth:         [3, 8]
+  min_child_samples: [10, 100] step=10
+
+VALIDATION: Walk-Forward Expanding Window
+  Min train size: 4320 bars (~6 months)
+  Test size:      720 bars (~1 month)
+  Windows:        10
+
+OBJECTIVE: Profit Factor (capped at 3.0)
+  Trials: 50
+
+------------------------------------------------------------
+DEFAULT PARAMETERS (baseline):
+  n_estimators:      200
+  learning_rate:     0.05
+  max_depth:         6
+  min_child_samples: 20
+  Walk-Forward mean PF: 1.0110
+  Per-window PFs:       [np.float64(0.8937), np.float64(1.2854), np.float64(1.0671), np.float64(0.9316), np.float64(0.7005), np.float64(1.2893), np.float64(1.2362), np.float64(0.5283), np.float64(1.3262), np.float64(0.8517)]
+  PF std:               0.2609
+  Windows PF>=1.0:      5/10
+
+------------------------------------------------------------
+BEST PARAMETERS (optimized):
+  n_estimators:      300
+  learning_rate:     0.061927
+  max_depth:         4
+  min_child_samples: 10
+  Walk-Forward mean PF: 1.1868
+  Per-window PFs:       [np.float64(0.9638), np.float64(1.4637), np.float64(1.1425), np.float64(1.0923), np.float64(1.0154), np.float64(1.3454), np.float64(1.7232), np.float64(0.554), np.float64(1.5061), np.float64(1.0613)]
+  PF std:               0.3159
+  Valid windows:        10
+
+------------------------------------------------------------
+COMPARISON:
+  Default mean PF: 1.0110
+  Best mean PF:    1.1868
+  Delta:           +0.1758 (+17.4%)
+  Default PF std:  0.2609
+  Best PF std:     0.3159
+
+------------------------------------------------------------
+TOP 5 TRIALS:
+  #1 PF=1.1868 | n_est=300, lr=0.0619, depth=4, min_child=10
+  #2 PF=1.1774 | n_est=400, lr=0.0852, depth=3, min_child=20
+  #3 PF=1.1580 | n_est=350, lr=0.0891, depth=3, min_child=10
+  #4 PF=1.1507 | n_est=350, lr=0.0813, depth=3, min_child=10
+  #5 PF=1.1463 | n_est=350, lr=0.0854, depth=3, min_child=10
+
+------------------------------------------------------------
+OVERFITTING RISK ASSESSMENT:
+  Search params:       4 (reduced from 14)
+  Validation method:   Walk-Forward Expanding Window (no lookahead)
+  PF cap:              3.0 (prevents rewarding extreme values)
+  Best/Default ratio:  1.17x
+  OK: Moderate improvement, reasonable optimization gain

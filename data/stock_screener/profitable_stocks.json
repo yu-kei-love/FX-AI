@@ -1,0 +1,28 @@
+[
+  {
+    "ticker": "9984.T",
+    "name": "ソフトバンクG",
+    "best_conf": 0.7,
+    "best_agree": 5,
+    "pf": 1.533,
+    "win_rate": 0.6053,
+    "exp_value": 5.3e-05,
+    "trades": 38,
+    "top_us_indicator": "^SOX",
+    "top_us_name": "SOX_半導体",
+    "correlation": 0.4881
+  },
+  {
+    "ticker": "6723.T",
+    "name": "ルネサス",
+    "best_conf": 0.55,
+    "best_agree": 5,
+    "pf": 1.718,
+    "win_rate": 0.6321,
+    "exp_value": 0.000321,
+    "trades": 106,
+    "top_us_indicator": "^SOX",
+    "top_us_name": "SOX_半導体",
+    "correlation": 0.4263
+  }
+]

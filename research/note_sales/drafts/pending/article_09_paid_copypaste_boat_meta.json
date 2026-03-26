@@ -1,0 +1,48 @@
+{
+  "title": "【コピペで動く】はじめての競艇AI予測 — Pythonがわからなくても大丈夫",
+  "price": 980,
+  "currency": "JPY",
+  "status": "draft",
+  "category": "paid",
+  "target_audience": "beginner",
+  "platform": "note.com",
+  "tags": [
+    "競艇AI",
+    "ボートレース",
+    "Python",
+    "初心者",
+    "コピペ",
+    "機械学習",
+    "AI予測"
+  ],
+  "estimated_chars": 5800,
+  "free_preview_chars": 2900,
+  "structure": {
+    "free_section": [
+      "完成形のイメージ（出力サンプル）",
+      "必要なもの（3点）",
+      "全体の流れ（5ステップ概要）",
+      "Pythonの準備手順"
+    ],
+    "paid_section": [
+      "Step 1: データの準備（CSV形式の説明）",
+      "Step 2: 特徴量の作り方（10個、各説明付き）",
+      "Step 3: モデルの学習（LightGBMパラメータ解説）",
+      "Step 4: 予測の出し方（EV閾値判定）",
+      "Step 5: 結果の確認方法",
+      "完成コード（約80行、全行日本語コメント付き）",
+      "よくある質問（5問）",
+      "うまくいかないときの対処法（4パターン）",
+      "次のステップ"
+    ]
+  },
+  "code_details": {
+    "language": "Python",
+    "lines": 80,
+    "model": "LightGBM",
+    "features": 10,
+    "simplified_from": "boat_model.py (48 features, 5-model ensemble)"
+  },
+  "created_at": "2026-03-26",
+  "notes": "Simplified version of boat_model.py for beginners. Uses single LightGBM instead of 5-model ensemble, 10 features instead of 48. Includes sample data generator so it works without external data."
+}

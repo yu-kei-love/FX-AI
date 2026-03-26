@@ -1,0 +1,36 @@
+======================================================================
+Ensemble Weight Optimization Results
+Date: 2026-03-27 02:07:54
+======================================================================
+
+──────────────────────────────────────────────────
+Model: FX
+Best Strategy: sharpe_based
+──────────────────────────────────────────────────
+  equal             : pf=1.1319 sharpe=4.2593 win_rate=0.5172 n_trades=6069 total_return=1.2154
+  performance       : pf=1.1323 sharpe=4.2716 win_rate=0.5177 n_trades=6069 total_return=1.2189
+  sharpe_based      : pf=1.1374 sharpe=4.4273 win_rate=0.5187 n_trades=6069 total_return=1.2632
+  inverse_error     : pf=1.1327 sharpe=4.2850 win_rate=0.5174 n_trades=6069 total_return=1.2227
+  stacking          : pf=0.9759 sharpe=-0.8381 win_rate=0.4904 n_trades=6069 total_return=-0.2394
+
+──────────────────────────────────────────────────
+Model: Crypto
+Best Strategy: stacking (already in use)
+──────────────────────────────────────────────────
+  current: LogisticRegression stacking (C=1.0)
+  recommendation: C値のチューニング or Ridge回帰への変更を検討
+
+======================================================================
+Recommendations:
+======================================================================
+
+  FX:
+    Current: accuracy^3 weights (performance strategy)
+    Optimal: sharpe_based
+    Action: paper_trade.py の compute_model_weights を
+            sharpe_based 方式に変更
+
+  Crypto:
+    Current: LogisticRegression stacking
+    Optimal: stacking (already in use)
+    Action: MetaEnsemble の C パラメータ調整を検討

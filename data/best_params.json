@@ -1,0 +1,20 @@
+{
+  "triple_barrier": {
+    "barrier_up": 0.005,
+    "barrier_down": -0.003,
+    "barrier_t": 24
+  },
+  "wait_mode": {
+    "vol_mult": 2.4750990037296177,
+    "regime_change_thresh": 2,
+    "price_change_mult": 3.0
+  },
+  "meta_labeling": {
+    "adoption_target": 0.3424007372128677
+  },
+  "lgbm": {
+    "n_estimators": 200,
+    "learning_rate": 0.07641713786008023,
+    "max_depth": 6
+  }
+}

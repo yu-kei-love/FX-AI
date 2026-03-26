@@ -1,0 +1,5 @@
+[2026-03-16T11:19:58.653120] --- 自動投稿開始（日付: 2026-03-16）---
+[2026-03-16T11:19:58.653120] WordPress: 未設定のためスキップ（WORDPRESS_URL / USER / PASSWORD）
+[2026-03-16T11:19:58.653120] Substack: 原稿を保存しました C:\Users\kawanoyuu\Desktop\FX-AI\content\substack_draft\2026-03-16_substack_draft.txt
+[2026-03-16T11:19:58.669027] X: 投稿文を保存しました C:\Users\kawanoyuu\Desktop\FX-AI\content\x_draft\2026-03-16_x_draft.txt
+[2026-03-16T11:19:58.670095] --- 自動投稿処理完了 ---

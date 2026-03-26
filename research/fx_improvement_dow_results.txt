@@ -1,0 +1,57 @@
+======================================================================
+Day-of-Week Filter Analysis (Walk-Forward)
+======================================================================
+
+==================================================
+Pair: USDJPY
+==================================================
+Data: 11852 rows, 2024-04-17 00:00:00 to 2026-03-26 03:00:00
+
+--- Per-Day Profitability ---
+  Mon: PF=1.66, WinRate=60.8%, Trades=559, ExpVal=+0.000344, Sharpe=17.35
+  Tue: PF=0.79, WinRate=46.5%, Trades=535, ExpVal=-0.000640, Sharpe=-8.38
+  Wed: PF=1.76, WinRate=59.5%, Trades=494, ExpVal=+0.000577, Sharpe=19.65
+  Thu: PF=1.87, WinRate=62.1%, Trades=459, ExpVal=+0.000526, Sharpe=21.37
+  Fri: PF=2.07, WinRate=58.2%, Trades=491, ExpVal=+0.001060, Sharpe=22.51
+
+--- Baseline (no day filter) ---
+  PF=1.55, Sharpe=14.44, WinRate=57.3%, Trades=2538, ExpVal=+0.000353
+
+--- Skip Individual Days ---
+  Skip Mon: PF=1.52, Sharpe=13.87, WinRate=56.3%, Trades=1979, ExpVal=+0.000356
+  Skip Tue: PF=1.84, Sharpe=19.96, WinRate=60.2%, Trades=2003, ExpVal=+0.000619
+  Skip Wed: PF=1.50, Sharpe=13.21, WinRate=56.8%, Trades=2044, ExpVal=+0.000299
+  Skip Thu: PF=1.49, Sharpe=13.21, WinRate=56.2%, Trades=2079, ExpVal=+0.000315
+  Skip Fri: PF=1.41, Sharpe=11.93, WinRate=57.1%, Trades=2047, ExpVal=+0.000184
+
+--- Best Single Day Filter: Skip Tue ---
+  PF improvement: 1.55 -> 1.84
+  ExpVal improvement: +0.000353 -> +0.000619
+  RECOMMENDATION: Apply skip Tue
+
+==================================================
+Pair: AUDJPY
+==================================================
+Data: 11842 rows, 2024-04-16 00:00:00+00:00 to 2026-03-23 05:00:00+00:00
+
+--- Per-Day Profitability ---
+  Mon: PF=1.34, WinRate=54.6%, Trades=522, ExpVal=+0.000125, Sharpe=10.89
+  Tue: PF=1.27, WinRate=55.8%, Trades=563, ExpVal=+0.000087, Sharpe=8.79
+  Wed: PF=1.54, WinRate=52.6%, Trades=511, ExpVal=+0.000321, Sharpe=14.35
+  Thu: PF=1.87, WinRate=66.8%, Trades=434, ExpVal=+0.000783, Sharpe=21.35
+  Fri: PF=2.01, WinRate=58.7%, Trades=419, ExpVal=+0.001099, Sharpe=21.09
+
+--- Baseline (no day filter) ---
+  PF=1.58, Sharpe=15.17, WinRate=57.3%, Trades=2449, ExpVal=+0.000440
+
+--- Skip Individual Days ---
+  Skip Mon: PF=1.64, Sharpe=16.16, WinRate=58.1%, Trades=1927, ExpVal=+0.000526
+  Skip Tue: PF=1.68, Sharpe=16.88, WinRate=57.8%, Trades=1886, ExpVal=+0.000546
+  Skip Wed: PF=1.58, Sharpe=15.38, WinRate=58.6%, Trades=1938, ExpVal=+0.000472
+  Skip Thu: PF=1.51, Sharpe=13.78, WinRate=55.3%, Trades=2015, ExpVal=+0.000366
+  Skip Fri: PF=1.48, Sharpe=13.67, WinRate=57.0%, Trades=2030, ExpVal=+0.000304
+
+--- Best Single Day Filter: Skip Tue ---
+  PF improvement: 1.58 -> 1.68
+  ExpVal improvement: +0.000440 -> +0.000546
+  RECOMMENDATION: Apply skip Tue

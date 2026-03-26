@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+*.log
+mlruns/
+.streamlit/
+*.pkl
+*.pt
+*.joblib
+node_modules/
