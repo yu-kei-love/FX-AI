@@ -1,0 +1,89 @@
+FX v3.5 Walk-Forward Validation (Post Look-Ahead Bias Fix)
+================================================================================
+Loading USDJPY 1h data...
+Raw data: 12261 bars, 2024-03-26 20:00:00+00:00 to 2026-03-26 20:00:00+00:00
+Computing features (v3.5 with shift(1) MTF fix)...
+After feature computation: 11833 bars, 35 features
+Features: ['RSI_14', 'MACD', 'MACD_hist', 'BB_width', 'MA_25', 'Return_1', 'Return_3', 'Return_6', 'Return_24', 'Volatility_24', 'Hour', 'DayOfWeek', 'RSI_4h', 'MACD_hist_4h', 'BB_width_4h', 'RSI_daily', 'MACD_hist_daily', 'BB_width_daily', 'Daily_trend_dir', 'RSI_x_Vol', 'MACD_norm', 'BB_position', 'MA_cross', 'Momentum_accel', 'Vol_change', 'HL_ratio', 'Close_position', 'Return_skew_12', 'Vol_percentile', 'Vol_of_vol', 'Hour_x_DoW', 'Session_tokyo', 'Session_london', 'Session_ny', 'Session_overlap']
+
+Data: 11833 bars, 2024-04-18 00:00:00+00:00 to 2026-03-26 08:00:00+00:00
+Folds: 5, min train: 2000, test size: ~1966
+================================================================================
+
+Fold 1/5: train=2000, test=1966
+  Train: 2024-04-18 00:00:00+00:00 to 2024-08-14 16:00:00+00:00
+  Test:  2024-08-14 17:00:00+00:00 to 2024-12-10 02:00:00+00:00
+  Weights: ['0.200', '0.200', '0.200', '0.200', '0.200']
+  Trades: 786, PF: 1.31, Sharpe: 6.12, WinRate: 56.1%, MDD: -20.97%
+
+Fold 2/5: train=3966, test=1966
+  Train: 2024-04-18 00:00:00+00:00 to 2024-12-10 02:00:00+00:00
+  Test:  2024-12-10 03:00:00+00:00 to 2025-04-07 18:00:00+00:00
+  Weights: ['0.200', '0.200', '0.200', '0.200', '0.200']
+  Trades: 520, PF: 1.26, Sharpe: 4.21, WinRate: 54.0%, MDD: -22.15%
+
+Fold 3/5: train=5932, test=1966
+  Train: 2024-04-18 00:00:00+00:00 to 2025-04-07 18:00:00+00:00
+  Test:  2025-04-07 19:00:00+00:00 to 2025-08-01 00:00:00+00:00
+  Weights: ['0.256', '0.175', '0.313', '0.256', '0.000']
+  Trades: 487, PF: 0.83, Sharpe: -3.24, WinRate: 49.3%, MDD: -36.10%
+
+Fold 4/5: train=7898, test=1966
+  Train: 2024-04-18 00:00:00+00:00 to 2025-08-01 00:00:00+00:00
+  Test:  2025-08-01 01:00:00+00:00 to 2025-11-26 13:00:00+00:00
+  Weights: ['0.000', '0.000', '0.000', '0.000', '1.000']
+  Trades: 16, PF: 3.67, Sharpe: 3.13, WinRate: 43.8%, MDD: -1.85%
+
+Fold 5/5: train=9864, test=1969
+  Train: 2024-04-18 00:00:00+00:00 to 2025-11-26 13:00:00+00:00
+  Test:  2025-11-26 14:00:00+00:00 to 2026-03-26 08:00:00+00:00
+  Weights: ['0.158', '0.103', '0.270', '0.158', '0.312']
+  Trades: 227, PF: 1.41, Sharpe: 3.85, WinRate: 59.5%, MDD: -11.75%
+
+================================================================================
+FX v3.5 Walk-Forward Validation Results (POST Look-Ahead Bias Fix)
+Date: 2026-03-27 05:52
+================================================================================
+
+Configuration:
+  Data: USDJPY 1h, 11833 bars
+  Period: 2024-04-18 00:00:00+00:00 to 2026-03-26 08:00:00+00:00
+  Folds: 5 (expanding window)
+  Min training bars: 2000
+  Ensemble: LightGBM, XGBoost, CatBoost, RandomForest, ExtraTrees
+  Hyperparams: n_estimators=300, learning_rate=0.062
+  Forecast horizon: 12h
+  Confidence threshold: 0.6
+  Min agreement: 4/5
+  Filters: Tuesday skip, hour filter (UTC 20,23), volatility filter, trend filter
+  MTF features: v3.5 fix (shift(1) applied to prevent look-ahead bias)
+  Features: 35 columns
+
+--------------------------------------------------------------------------------
+Per-Fold Results:
+--------------------------------------------------------------------------------
+Fold  Trades       PF   Sharpe  WinRate     MDD%  Period
+--------------------------------------------------------------------------------
+   1     786     1.31     6.12   56.1%   -20.97  2024-08-14 to 2024-12-10
+   2     520     1.26     4.21   54.0%   -22.15  2024-12-10 to 2025-04-07
+   3     487     0.83    -3.24   49.3%   -36.10  2025-04-07 to 2025-08-01
+   4      16     3.67     3.13   43.8%    -1.85  2025-08-01 to 2025-11-26
+   5     227     1.41     3.85   59.5%   -11.75  2025-11-26 to 2026-03-26
+
+--------------------------------------------------------------------------------
+Overall Results (all folds combined):
+--------------------------------------------------------------------------------
+  Total trades:     2036
+  Profit Factor:    1.19
+  Sharpe Ratio:     2.71
+  Win Rate:         54.2%
+  Max Drawdown:     -36.10%
+  Avg Return/Trade: 0.0317%
+  Total Return:     64.52%
+  Gross Profit:     410.77%
+  Gross Loss:       346.25%
+  Wins / Losses:    1104 / 932
+
+================================================================================
+
+Results saved to: C:\Users\kawanoyuu\Desktop\FX-AI\research\fx_v35_validation_results.txt
