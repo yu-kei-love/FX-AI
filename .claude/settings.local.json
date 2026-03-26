@@ -223,7 +223,19 @@
       "Bash(python -m research.keiba.keiba_improvement)",
       "Bash(python research/keirin/keirin_improvement.py)",
       "Bash(gh auth:*)",
-      "Bash(where gh:*)"
+      "Bash(where gh:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI:/c/Users/kawanoyuu/AppData/Local/Programs/GitHub CLI:/c/Program Files \\(x86\\)/GitHub CLI\")",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/kawanoyuu/scoop/**)",
+      "Bash(winget install:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(\"/c/Program Files \\(x86\\)/GitHub CLI/gh.exe\" --version)",
+      "Bash(powershell -Command \"Get-Command gh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(powershell -Command \"powercfg /change standby-timeout-ac 0; powercfg /change monitor-timeout-ac 0; echo ''スリープ・モニタOFFを無効化しました''\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

@@ -5,25 +5,25 @@ Trend Direction Filter Analysis (Walk-Forward)
 ==================================================
 Pair: USDJPY
 ==================================================
-Data: 11852 rows
+Data: 11853 rows
 
 --- Baseline (no trend filter) ---
-  PF=1.55, Sharpe=14.44, WinRate=57.3%, Trades=2538, ExpVal=+0.000353
+  PF=1.50, Sharpe=13.37, WinRate=57.0%, Trades=2581, ExpVal=+0.000310
 
 --- Hard Trend Filters (block counter-trend) ---
-  SMA(20) hard filter: PF=2.84, Sharpe=32.54, WinRate=64.7%, Trades=945, ExpVal=+0.001098, Filtered=1593
-  SMA(50) hard filter: PF=3.21, Sharpe=36.14, WinRate=66.8%, Trades=793, ExpVal=+0.001259, Filtered=1745
-  EMA(20) hard filter: PF=2.67, Sharpe=31.30, WinRate=64.6%, Trades=885, ExpVal=+0.000989, Filtered=1653
-  SMA(100) hard filter: PF=1.71, Sharpe=18.69, WinRate=58.9%, Trades=881, ExpVal=+0.000442, Filtered=1657
-  Daily SMA(20) hard filter: PF=1.14, Sharpe=4.78, WinRate=55.1%, Trades=1320, ExpVal=-0.000125, Filtered=1218
+  SMA(20) hard filter: PF=2.76, Sharpe=32.03, WinRate=63.9%, Trades=962, ExpVal=+0.001124, Filtered=1619
+  SMA(50) hard filter: PF=3.00, Sharpe=34.55, WinRate=65.5%, Trades=809, ExpVal=+0.001252, Filtered=1772
+  EMA(20) hard filter: PF=2.56, Sharpe=30.29, WinRate=63.6%, Trades=905, ExpVal=+0.001003, Filtered=1676
+  SMA(100) hard filter: PF=1.70, Sharpe=18.37, WinRate=59.0%, Trades=878, ExpVal=+0.000464, Filtered=1703
+  Daily SMA(20) hard filter: PF=1.11, Sharpe=3.75, WinRate=54.5%, Trades=1305, ExpVal=-0.000158, Filtered=1276
 
 --- Soft Trend Filters (higher conf for counter-trend) ---
-  SMA(20) soft +5%: PF=1.65, Sharpe=16.46, WinRate=57.0%, Trades=2067, ExpVal=+0.000446
-  SMA(20) soft +10%: PF=1.79, Sharpe=19.05, WinRate=58.6%, Trades=1618, ExpVal=+0.000563
-  SMA(50) soft +5%: PF=1.63, Sharpe=15.94, WinRate=56.8%, Trades=2034, ExpVal=+0.000438
-  SMA(50) soft +10%: PF=1.84, Sharpe=19.67, WinRate=59.0%, Trades=1533, ExpVal=+0.000634
-  EMA(20) soft +5%: PF=1.63, Sharpe=16.08, WinRate=57.1%, Trades=2061, ExpVal=+0.000429
-  EMA(20) soft +10%: PF=1.77, Sharpe=18.54, WinRate=58.7%, Trades=1587, ExpVal=+0.000548
+  SMA(20) soft +5%: PF=1.66, Sharpe=16.63, WinRate=57.0%, Trades=2142, ExpVal=+0.000452
+  SMA(20) soft +10%: PF=1.87, Sharpe=20.47, WinRate=58.6%, Trades=1632, ExpVal=+0.000638
+  SMA(50) soft +5%: PF=1.62, Sharpe=15.86, WinRate=56.6%, Trades=2116, ExpVal=+0.000434
+  SMA(50) soft +10%: PF=1.90, Sharpe=20.69, WinRate=59.0%, Trades=1540, ExpVal=+0.000694
+  EMA(20) soft +5%: PF=1.63, Sharpe=16.03, WinRate=56.8%, Trades=2144, ExpVal=+0.000428
+  EMA(20) soft +10%: PF=1.85, Sharpe=19.97, WinRate=58.8%, Trades=1606, ExpVal=+0.000626
 
   BEST: SMA(50) soft +10% (type=soft)
   RECOMMENDATION: Apply trend filter using SMA_50

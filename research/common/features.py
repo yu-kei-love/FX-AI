@@ -151,10 +151,14 @@ def add_multi_timeframe_features(df: pd.DataFrame) -> pd.DataFrame:
     df_d["Daily_trend_dir"] = (df_d["Close"] > df_d["Close"].rolling(20).mean()).astype(float)
 
     # マージ（forward-fill）
+    # v3.5 修正: 未確定ローソク足の未来漏洩を防止するため、1本前にshift
+    # 例: 10:00時点では08:00-12:00の4h足はまだ未確定なので、04:00-08:00の確定済み値を使う
     for col in ["RSI_4h", "MACD_hist_4h", "BB_width_4h"]:
-        df[col] = df_4h[col].reindex(df.index, method="ffill")
+        shifted = df_4h[col].shift(1)  # 1本前の確定済みデータのみ使用
+        df[col] = shifted.reindex(df.index, method="ffill")
     for col in ["RSI_daily", "MACD_hist_daily", "BB_width_daily", "Daily_trend_dir"]:
-        df[col] = df_d[col].reindex(df.index, method="ffill")
+        shifted = df_d[col].shift(1)  # 1本前の確定済みデータのみ使用
+        df[col] = shifted.reindex(df.index, method="ffill")
 
     return df
 

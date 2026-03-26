@@ -246,8 +246,9 @@ def add_multi_timeframe_features(
     feat[f"ATR_{suffix}"] = compute_atr(high, low, close, 14)
     feat[f"ADX_{suffix}"] = compute_adx(high, low, close, 14)
 
-    # Forward-fill onto 1h index
-    feat = feat.reindex(df.index, method="ffill")
+    # v3.5 修正: 未確定ローソク足の未来漏洩を防止するため、1本前にshift
+    # 現在進行中のリサンプル足はまだ確定していないので、確定済みの前回値を使う
+    feat = feat.shift(1).reindex(df.index, method="ffill")
     for col in feat.columns:
         df[col] = feat[col]
     return df
@@ -1099,55 +1100,37 @@ def compute_trading_metrics(
     rec = recall_score(traded_labels, traded_preds, zero_division=0)
     f1 = f1_score(traded_labels, traded_preds, zero_division=0)
 
-    # Trading P&L with consecutive loss filter (pause after 3 losses)
+    # v3.5 修正: 連続損失フィルター除去（バックテスト結果を歪めるため）
+    # 全トレードの生リターンでPF/Sharpeを計算する
     direction = np.where(predictions[trade_mask] > 0.5, 1, -1)
-    raw_returns = direction * traded_returns - TRANSACTION_COST
-
-    # Apply consecutive loss filter
-    strategy_returns = np.zeros_like(raw_returns)
-    consec_losses = 0
-    for i in range(len(raw_returns)):
-        if consec_losses >= 3:
-            strategy_returns[i] = 0.0  # skip trade
-            if raw_returns[i] > 0:  # would have won, reset counter
-                consec_losses = 0
-        else:
-            strategy_returns[i] = raw_returns[i]
-            if raw_returns[i] < 0:
-                consec_losses += 1
-            else:
-                consec_losses = 0
+    strategy_returns = direction * traded_returns - TRANSACTION_COST
 
     cumulative = (1 + strategy_returns).cumprod()
 
     # Portfolio-level Sharpe: include all bars (0 return for non-traded)
-    # This gives an honest picture of the strategy's risk-adjusted performance
     all_bar_returns = np.zeros(len(predictions))
     traded_indices = np.where(trade_mask)[0]
     for i, idx in enumerate(traded_indices):
         all_bar_returns[idx] = strategy_returns[i]
 
-    # Hourly bars with FORECAST_HORIZON: each return covers FORECAST_HORIZON hours
-    # Effective non-overlapping periods per year: 8760 / FORECAST_HORIZON
-    periods_per_year = 8760 / FORECAST_HORIZON
+    # v3.5 修正: Sharpe年率換算 — トレード頻度ベースで正しく計算
+    # 実際のトレード数/全バー数 × 年間バー数 = 年間実効トレード数
+    trade_ratio = len(strategy_returns) / max(len(predictions), 1)
+    effective_trades_per_year = trade_ratio * (8760 / FORECAST_HORIZON)
     sharpe = 0.0
-    if all_bar_returns.std() > 0:
-        sharpe = all_bar_returns.mean() / all_bar_returns.std() * np.sqrt(periods_per_year)
+    if strategy_returns.std() > 0 and len(strategy_returns) > 1:
+        sharpe = strategy_returns.mean() / strategy_returns.std() * np.sqrt(effective_trades_per_year)
 
-    # Per-trade Sharpe (for reference, higher due to excluding flat periods)
-    per_trade_sharpe = 0.0
-    active = strategy_returns[strategy_returns != 0]
-    if len(active) > 0 and active.std() > 0:
-        per_trade_sharpe = active.mean() / active.std() * np.sqrt(min(len(active) * (8760 / len(predictions)), periods_per_year))
+    per_trade_sharpe = sharpe  # 同一（フィルター除去後は区別不要）
 
     # Max drawdown
     peak = np.maximum.accumulate(cumulative)
     drawdown = (peak - cumulative) / peak
     max_dd = drawdown.max() if len(drawdown) > 0 else 0.0
 
-    win_rate = (strategy_returns[strategy_returns != 0] > 0).mean() if (strategy_returns != 0).any() else 0.0
+    win_rate = (strategy_returns > 0).mean() if len(strategy_returns) > 0 else 0.0
 
-    # Profit Factor
+    # Profit Factor（生データで計算）
     gains = strategy_returns[strategy_returns > 0].sum()
     losses = abs(strategy_returns[strategy_returns < 0].sum())
     profit_factor = gains / losses if losses > 0 else float('inf')
@@ -1511,19 +1494,19 @@ class HybridCryptoModel:
             final_metrics = compute_trading_metrics(final_pred, y_test_final, returns_test_final)
 
         # Calibrate predictions using Platt scaling (LogisticRegression)
-        # Replaces IsotonicRegression which created discrete step functions
-        # that didn't generalize from batch to rolling predictions.
-        # Platt scaling fits a smooth sigmoid, which generalizes much better.
+        # v3.5 修正: テストデータではなくバリデーションデータでキャリブレーション
+        # テストラベルを使うと未来情報の漏洩になる
         if len(X_val_final) > 0:
-            cal_pred = final_pred
-            cal_labels = y_test_final[-len(final_pred):]
-            if len(cal_pred) == len(cal_labels):
+            # バリデーションセットの予測値でキャリブレーション
+            cal_pred_val = gbm_val_final  # GBMのバリデーション予測を使用
+            cal_labels_val = y_val_final[-len(cal_pred_val):]
+            if len(cal_pred_val) == len(cal_labels_val):
                 try:
                     platt_lr = LogisticRegression(C=1.0, solver="lbfgs", max_iter=1000)
-                    platt_lr.fit(cal_pred.reshape(-1, 1), cal_labels)
+                    platt_lr.fit(cal_pred_val.reshape(-1, 1), cal_labels_val)
                     self._calibrator = platt_lr
-                    logger.info(f"Platt calibration fitted: range [{cal_pred.min():.4f}, {cal_pred.max():.4f}]")
-                    calibrated = platt_lr.predict_proba(cal_pred.reshape(-1, 1))[:, 1]
+                    logger.info(f"Platt calibration fitted on val: range [{cal_pred_val.min():.4f}, {cal_pred_val.max():.4f}]")
+                    calibrated = platt_lr.predict_proba(final_pred.reshape(-1, 1))[:, 1]
                     logger.info(f"Calibrated pred range [{calibrated.min():.4f}, {calibrated.max():.4f}]")
                     logger.info(f"Calibrated mean: {calibrated.mean():.4f}, <0.5: {(calibrated < 0.5).sum()}/{len(calibrated)}")
                 except Exception as e:
