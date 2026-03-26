@@ -1,0 +1,257 @@
+============================================================
+BOAT RACING MODEL - REAL DATA VALIDATION
+Using ONLY real_race_data.csv (no synthetic data)
+============================================================
+
+[1/4] Data quality check...
+Total races in CSV: 10466
+Races with odds_1: 2718 / 10466 (26.0%)
+Races with local_win_rate: 8484 / 10466 (81.1%)
+Races with weight: 9744 / 10466 (93.1%)
+Date range: 20250104 to 20260326
+
+[2/4] Loading and processing real data...
+[データ読込] 10466レース分のリアルデータ
+[変換完了] 10443レース x 6艇 = 62658行
+[枠番別勝率 (リアル)]
+  1号艇: 55.2%
+  2号艇: 13.0%
+  3号艇: 12.4%
+  4号艇: 10.1%
+  5号艇: 6.3%
+  6号艇: 2.9%
+Processed: 10443 races, 62658 rows, 41 features
+
+[3/4] Running simple holdout validation...
+
+============================================================
+Simple Holdout Validation (train=70%, test=30%)
+============================================================
+Train: 7310 races (43860 rows)
+Test:  3133 races (18798 rows)
+Train date range: 2025-01-04 00:00:00 to 2025-12-15 00:00:00
+Test  date range: 2025-12-15 00:00:00 to 2026-03-26 00:00:00
+
+Training Win model (5 ensemble)...
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[221]	valid_0's binary_logloss: 0.304676
+
+--- Holdout Results (Win/単勝) ---
+  Bets:      2426
+  Wins:      1578
+  Hit rate:  65.0%
+  PF:        7.874
+  ROI:       3.3156 (331.6%)
+  Sharpe:    46.138
+  MDD:       1,500 yen
+  Total bet: 517,100 yen
+  Total ret: 1,714,500 yen
+  Total PnL: +1,197,400 yen
+
+--- Odds Analysis ---
+  Bets with likely real odds: 2426
+  Bets with approx odds:     0
+
+  [Real odds only] PF=7.874, ROI=3.3156, Hit=65.0%, Bets=2426
+
+--- Lane Analysis (Test data) ---
+  Lane 1: 2350 bets, hit=65.5%, PF=8.036, ROI=3.3383
+  Lane 2: 15 bets, hit=53.3%, PF=4.571, ROI=2.6667
+  Lane 3: 23 bets, hit=52.2%, PF=4.364, ROI=2.6087
+  Lane 4: 35 bets, hit=51.4%, PF=4.235, ROI=2.5714
+  Lane 5: 3 bets, hit=33.3%, PF=2.000, ROI=1.6667
+  Lane 6: no bets
+
+[4/4] Running walk-forward validation (5 folds)...
+
+============================================================
+Expanding Window Walk-Forward検証 (5ウィンドウ) [v3.1]
+Win: 5モデルアンサンブル (LGB+XGB+Cat+RF+ET)
+Place: 3モデルアンサンブル (LGB+XGB+Cat)
+============================================================
+
+--- Fold 1/5: 訓練=1740レース, テスト=1740レース ---
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[136]	valid_0's binary_logloss: 0.324559
+  Place model 訓練中...
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[130]	valid_0's binary_logloss: 0.484169
+  Place model 訓練完了
+  A_単勝: 319ベット, 的中率=21.9%, 回収率=2.443, PF=2.87, Sharpe=3.73
+  B_2連単: 317ベット, 的中率=16.1%, 回収率=4.074, PF=4.66, Sharpe=3.36
+  C_2連複: 747ベット, 的中率=11.7%, 回収率=1.979, PF=2.11, Sharpe=3.17
+
+--- Fold 2/5: 訓練=3480レース, テスト=1740レース ---
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[226]	valid_0's binary_logloss: 0.313114
+  Place model 訓練中...
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[164]	valid_0's binary_logloss: 0.481714
+  Place model 訓練完了
+  A_単勝: 1379ベット, 的中率=62.8%, 回収率=3.223, PF=7.25, Sharpe=32.73
+  B_2連単: 502ベット, 的中率=34.7%, 回収率=3.033, PF=4.11, Sharpe=10.94
+  C_2連複: 559ベット, 的中率=42.4%, 回収率=2.120, PF=2.94, Sharpe=10.71
+
+--- Fold 3/5: 訓練=5220レース, テスト=1740レース ---
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[122]	valid_0's binary_logloss: 0.328171
+  Place model 訓練中...
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[204]	valid_0's binary_logloss: 0.488444
+  Place model 訓練完了
+  A_単勝: 1375ベット, 的中率=66.2%, 回収率=3.382, PF=8.36, Sharpe=35.91
+  B_2連単: 513ベット, 的中率=32.8%, 回収率=2.865, PF=3.77, Sharpe=10.29
+  C_2連複: 588ベット, 的中率=40.0%, 回収率=1.998, PF=2.66, Sharpe=9.88
+
+--- Fold 4/5: 訓練=6960レース, テスト=1740レース ---
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[283]	valid_0's binary_logloss: 0.299385
+  Place model 訓練中...
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[191]	valid_0's binary_logloss: 0.474697
+  Place model 訓練完了
+  A_単勝: 1353ベット, 的中率=67.7%, 回収率=3.452, PF=8.92, Sharpe=37.10
+  B_2連単: 452ベット, 的中率=33.2%, 回収率=2.904, PF=3.85, Sharpe=9.82
+  C_2連複: 489ベット, 的中率=42.7%, 回収率=2.137, PF=2.99, Sharpe=10.16
+
+--- Fold 5/5: 訓練=8700レース, テスト=1740レース ---
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[207]	valid_0's binary_logloss: 0.306365
+  Place model 訓練中...
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[233]	valid_0's binary_logloss: 0.494627
+  Place model 訓練完了
+  A_単勝: 1343ベット, 的中率=63.2%, 回収率=3.222, PF=7.25, Sharpe=32.59
+  B_2連単: 428ベット, 的中率=32.9%, 回収率=2.883, PF=3.81, Sharpe=9.47
+  C_2連複: 496ベット, 的中率=41.5%, 回収率=2.077, PF=2.84, Sharpe=9.73
+
+============================================================
+Walk-Forward 全フォールド集計 [v3.1]
+============================================================
+
+A_単勝: PASS
+  合計ベット: 5769, 的中率: 62.6%
+  加重平均回収率: 3.271 (327.1%)
+  フォールド別回収率: 2.443, 3.223, 3.382, 3.452, 3.222
+  最小=2.443, 最大=3.452, SD=0.362
+  平均PF: 6.930, フォールド別: 2.87, 7.25, 8.36, 8.92, 7.25
+  平均Sharpe: 28.411, フォールド別: 3.73, 32.73, 35.91, 37.10, 32.59
+  最大MDD: 3,420円
+
+B_2連単: PASS
+  合計ベット: 2212, 的中率: 30.9%
+  加重平均回収率: 3.088 (308.8%)
+  フォールド別回収率: 4.074, 3.033, 2.865, 2.904, 2.883
+  最小=2.865, 最大=4.074, SD=0.465
+  平均PF: 4.041, フォールド別: 4.66, 4.11, 3.77, 3.85, 3.81
+  平均Sharpe: 8.777, フォールド別: 3.36, 10.94, 10.29, 9.82, 9.47
+  最大MDD: 6,042円
+
+C_2連複: PASS
+  合計ベット: 2879, 的中率: 33.8%
+  加重平均回収率: 2.054 (205.4%)
+  フォールド別回収率: 1.979, 2.120, 1.998, 2.137, 2.077
+  最小=1.979, 最大=2.137, SD=0.064
+  平均PF: 2.708, フォールド別: 2.11, 2.94, 2.66, 2.99, 2.84
+  平均Sharpe: 8.733, フォールド別: 3.17, 10.71, 9.88, 10.16, 9.73
+  最大MDD: 14,550円
+
+[特徴量重要度 (LightGBM, 最終フォールド)]
+  lane                             106226 ##############################
+  class_x_lane                      30856 ########
+  win_rate_vs_field_avg             20744 #####
+  start_timing_rank                 20609 #####
+  start_x_lane                      10387 ##
+  racer_win_rate                     5655 #
+  win_rate_rank                      4232 #
+  field_strength                     3184 
+  avg_start_timing                   2927 
+  start_x_class                      2571 
+  racer_class                        2225 
+  class_dominance                    2062 
+  place_consistency                  1773 
+  weight_diff                        1748 
+  racer_place_rate                   1734 
+  lane_class_motor                   1524 
+  motor_vs_field_avg                 1465 
+  class_rank_in_race                 1417 
+  racer_weight                       1414 
+  wave_height                        1395 
+[モデル保存] C:\Users\kawanoyuu\Desktop\FX-AI\data\boat\models (5 win + 3 place models)
+
+--- 枠番別分析（全テストデータ） ---
+  1号艇: 実勝率=55.2%, 予測平均=0.508
+  2号艇: 実勝率=12.7%, 予測平均=0.150
+  3号艇: 実勝率=12.6%, 予測平均=0.128
+  4号艇: 実勝率=10.1%, 予測平均=0.101
+  5号艇: 実勝率=6.4%, 予測平均=0.070
+  6号艇: 実勝率=2.9%, 予測平均=0.043
+
+[SAVED] C:\Users\kawanoyuu\Desktop\FX-AI\research\boat\real_data_validation_results.txt
+
+======================================================================
+  BOAT RACING MODEL - REAL DATA VALIDATION RESULTS
+  Generated: 2026-03-27 05:54:46
+  Data source: real_race_data.csv ONLY (no synthetic data)
+======================================================================
+
+--- SIMPLE HOLDOUT: No bets generated ---
+
+--- WALK-FORWARD (5 folds, expanding window) ---
+
+  A_単勝: [PASS]
+    Bets: 5769
+    Hit rate: 62.6%
+    Weighted ROI: 3.2712 (327.1%)
+    Avg PF: 6.930
+    Avg Sharpe: 28.411
+    Max MDD: 3,420 yen
+    Fold ROIs: 2.443, 3.223, 3.382, 3.452, 3.222
+    Fold PFs: 2.87, 7.25, 8.36, 8.92, 7.25
+    Min ROI: 2.443, Max ROI: 3.452, SD: 0.362
+
+  B_2連単: [PASS]
+    Bets: 2212
+    Hit rate: 30.9%
+    Weighted ROI: 3.0878 (308.8%)
+    Avg PF: 4.041
+    Avg Sharpe: 8.777
+    Max MDD: 6,042 yen
+    Fold ROIs: 4.074, 3.033, 2.865, 2.904, 2.883
+    Fold PFs: 4.66, 4.11, 3.77, 3.85, 3.81
+    Min ROI: 2.865, Max ROI: 4.074, SD: 0.465
+
+  C_2連複: [PASS]
+    Bets: 2879
+    Hit rate: 33.8%
+    Weighted ROI: 2.0538 (205.4%)
+    Avg PF: 2.708
+    Avg Sharpe: 8.733
+    Max MDD: 14,550 yen
+    Fold ROIs: 1.979, 2.120, 1.998, 2.137, 2.077
+    Fold PFs: 2.11, 2.94, 2.66, 2.99, 2.84
+    Min ROI: 1.979, Max ROI: 2.137, SD: 0.064
+
+======================================================================
+  VERDICT
+======================================================================
+  Holdout: No bets generated (filters too strict or data issue)
+
+  IMPORTANT CAVEATS:
+  - Many early races lack real odds data (uses approximate odds)
+  - Walk-forward on 10k races is reasonably robust
+  - Real-world slippage, late scratches, etc. are NOT modeled
+  - The 25% takeout rate is already factored into odds
+  - Past performance does not guarantee future results
+======================================================================
