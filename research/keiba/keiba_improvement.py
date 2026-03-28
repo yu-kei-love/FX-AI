@@ -79,7 +79,7 @@ def add_track_condition_interactions(df: pd.DataFrame) -> tuple[pd.DataFrame, li
     new_cols = []
 
     # 馬場状態 x 脚質
-    df["cond_x_style"] = df["track_condition"] * df["running_style"]
+    df["cond_x_style"] = df["track_condition"] * df["prev_running_style"]
     new_cols.append("cond_x_style")
 
     # 馬場状態 x 距離 (重馬場の長距離はスタミナ勝負)
@@ -88,19 +88,19 @@ def add_track_condition_interactions(df: pd.DataFrame) -> tuple[pd.DataFrame, li
 
     # 馬場状態 x 距離 x 脚質 (3-way interaction)
     df["cond_dist_style"] = (
-        df["track_condition"] * (df["distance"] / 2000.0) * df["running_style"]
+        df["track_condition"] * (df["distance"] / 2000.0) * df["prev_running_style"]
     )
     new_cols.append("cond_dist_style")
 
     # 良馬場の差し追込有利フラグ (良馬場で末脚が生きる)
     df["good_track_closer"] = (
-        (df["track_condition"] == 0) & (df["running_style"] >= 2)
+        (df["track_condition"] == 0) & (df["prev_running_style"] >= 2)
     ).astype(int)
     new_cols.append("good_track_closer")
 
     # 重馬場の先行有利フラグ
     df["heavy_track_front"] = (
-        (df["track_condition"] >= 2) & (df["running_style"] <= 1)
+        (df["track_condition"] >= 2) & (df["prev_running_style"] <= 1)
     ).astype(int)
     new_cols.append("heavy_track_front")
 
@@ -154,7 +154,7 @@ def add_pace_prediction_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list]:
     }
     def pace_style_score(row):
         fr = row["front_ratio"]
-        style = row["running_style"]
+        style = row["prev_running_style"]
         if fr > 0.45:  # ハイペース
             return {0: -0.3, 1: -0.1, 2: 0.2, 3: 0.3}.get(style, 0)
         elif fr < 0.30:  # スローペース

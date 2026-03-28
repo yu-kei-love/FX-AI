@@ -1093,7 +1093,9 @@ def compute_trading_metrics(
     # Classification metrics on traded signals
     if len(traded_preds) == 0:
         return {"accuracy": 0, "precision": 0, "recall": 0, "f1": 0,
-                "sharpe": 0, "max_drawdown": 0, "trade_count": 0, "win_rate": 0}
+                "sharpe": 0, "per_trade_sharpe": 0, "profit_factor": 0,
+                "max_drawdown": 0, "trade_count": 0, "total_bars": len(predictions),
+                "win_rate": 0, "total_return": 0}
 
     acc = accuracy_score(traded_labels, traded_preds)
     prec = precision_score(traded_labels, traded_preds, zero_division=0)
@@ -1523,10 +1525,12 @@ class HybridCryptoModel:
 
         # Summary
         avg_metrics = {}
-        for key in all_fold_metrics[0]:
-            if key == "fold":
-                continue
-            vals = [m[key] for m in all_fold_metrics]
+        all_keys = set()
+        for m in all_fold_metrics:
+            all_keys.update(m.keys())
+        all_keys.discard("fold")
+        for key in sorted(all_keys):
+            vals = [m.get(key, 0) for m in all_fold_metrics]
             avg_metrics[f"avg_{key}"] = round(np.mean(vals), 4)
             avg_metrics[f"std_{key}"] = round(np.std(vals), 4)
 

@@ -69,8 +69,8 @@ FEATURE_COLS = [
     "field_size",          # 出走頭数
     # クラス
     "race_class",          # G1=5, G2=4, G3=3, Listed=2, Open=1, 条件=0
-    # 脚質
-    "running_style",       # 逃げ=0, 先行=1, 差し=2, 追込=3
+    # 脚質（v3.5: 前走の脚質を使用、当該レースの結果データは使わない）
+    "prev_running_style",  # 逃げ=0, 先行=1, 差し=2, 追込=3
     # オッズ
     "odds",                # 単勝オッズ
     "popularity",          # 人気順
@@ -87,12 +87,12 @@ REAL_DATA_CSV = DATA_DIR / "real_race_results.csv"
 # v2.1 pruned: Removed sire_encoded, bms_encoded (near-zero importance),
 #   venue_aptitude (near-zero), odds_vs_jockey (correlated w/ odds, keep odds)
 REAL_FEATURE_COLS = FEATURE_COLS + [
-    "last_3f",             # 上がり3F（前走）
-    "last_3f_rank",        # 上がり3F順位（前走）
-    "corner_position_4",   # 最終コーナー通過順位
+    # v3.5: last_3f, corner_position_4 は当該レース結果データのため除外
+    # 代わりに prev_last_3f（前走の上がり3F）を使用
+    "last_3f_rank",        # 上がり3F順位（prev_last_3fベースに修正済み）
     "weight_carried",      # 斤量
     # v2.1: 追加実データ特徴量
-    "prev_last_3f",        # 前走の上がり3F（このレース結果ではなく前走の）
+    "prev_last_3f",        # 前走の上がり3F
     "dist_aptitude",       # 距離適性（同距離帯での勝率）
     "track_aptitude",      # 馬場適性（同馬場タイプでの勝率）
     "class_x_age",         # クラス×馬齢交互作用
@@ -199,9 +199,11 @@ def load_real_data() -> pd.DataFrame:
     df["running_style"] = df["corner_position_4"].apply(_estimate_running_style)
 
     # --- 上がり3Fランク（レース内順位） ---
-    # Note: last_3f_rank uses CURRENT race data (known after race).
-    # For prediction, prev_last_3f (from rolling stats) is the non-leaking version.
-    df["last_3f_rank"] = df.groupby("race_id")["last_3f"].rank(method="min", ascending=True)
+    # v3.5 修正: 当該レースのlast_3fは結果データのためlook-ahead bias
+    # prev_last_3f（前走の上がり3F）でレース内ランキングを計算
+    # prev_last_3fがない場合（合成データ等）はlast_3fを使用（後方互換）
+    rank_col = "prev_last_3f" if "prev_last_3f" in df.columns else "last_3f"
+    df["last_3f_rank"] = df.groupby("race_id")[rank_col].rank(method="min", ascending=True)
     df["last_3f_rank"] = df["last_3f_rank"].fillna(0).astype(int)
 
     # --- 会場情報を追加 ---
@@ -276,11 +278,13 @@ def _compute_rolling_stats(df: pd.DataFrame) -> pd.DataFrame:
     df["dist_aptitude"] = 0.0
     df["track_aptitude"] = 0.0
     df["venue_aptitude"] = 0.0
+    df["prev_running_style"] = 1  # デフォルト: 先行
 
     # レース日でグループ化して時系列処理
     horse_history = {}   # horse_id -> list of finishes
     horse_dates = {}     # horse_id -> list of dates
     horse_last3f = {}    # horse_id -> list of last_3f times
+    horse_styles = {}    # horse_id -> list of running_styles (past races)
     horse_dist = {}      # horse_id -> {distance_band: (wins, runs)}
     horse_track = {}     # horse_id -> {track_type: (wins, runs)}
     horse_venue = {}     # horse_id -> {venue: (wins, runs)}
@@ -328,6 +332,11 @@ def _compute_rolling_stats(df: pd.DataFrame) -> pd.DataFrame:
             if past_3f:
                 df.at[idx, "prev_last_3f"] = past_3f[-1]
 
+            # v3.5: 前走の脚質（look-ahead bias修正: 当該レースのrunning_styleは使わない）
+            past_styles = horse_styles.get(hid, [])
+            if past_styles:
+                df.at[idx, "prev_running_style"] = past_styles[-1]
+
             # v2.1: 距離適性（同距離帯での複勝率）
             if hid in horse_dist and dist_band in horse_dist[hid]:
                 d_wins, d_runs = horse_dist[hid][dist_band]
@@ -374,6 +383,11 @@ def _compute_rolling_stats(df: pd.DataFrame) -> pd.DataFrame:
             horse_dates[hid].append(race_date)
             if last_3f_val > 0:
                 horse_last3f[hid].append(last_3f_val)
+            # 脚質を履歴に追加（当該レースのrunning_style）
+            current_style = row.get("running_style", 1)
+            if hid not in horse_styles:
+                horse_styles[hid] = []
+            horse_styles[hid].append(current_style)
 
             # 距離帯別成績
             if dist_band not in horse_dist[hid]:
@@ -707,16 +721,16 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # --- v2.0 追加特徴量 ---
 
-    # ペース予測: レース内の先行馬（逃げ+先行）の割合
-    if "running_style" in df.columns:
-        df["is_front_runner"] = (df["running_style"] <= 1).astype(int)
-        pace_map = df.groupby("race_id")["is_front_runner"].transform("mean")
-        df["pace_predict"] = pace_map
-        # 脚質×ペースの交互作用
-        df["style_pace_interact"] = df["running_style"] * df["pace_predict"]
-    else:
-        df["pace_predict"] = 0.4
-        df["style_pace_interact"] = 0.0
+    # ペース予測: レース内の前走脚質ベースの先行馬割合（v3.5: look-ahead bias修正）
+    # 当該レースのrunning_style（結果データ）ではなく、前走の脚質を使用
+    # prev_running_styleがない場合（合成データ等）はデフォルト値1（先行）を使用
+    if "prev_running_style" not in df.columns:
+        df["prev_running_style"] = 1
+    df["is_front_runner"] = (df["prev_running_style"] <= 1).astype(int)
+    pace_map = df.groupby("race_id")["is_front_runner"].transform("mean")
+    df["pace_predict"] = pace_map
+    # 前走脚質×ペースの交互作用
+    df["style_pace_interact"] = df["prev_running_style"] * df["pace_predict"]
 
     # 距離適性指数（距離カテゴリ × 馬の成績パターン）
     df["dist_category"] = pd.cut(df["distance"],

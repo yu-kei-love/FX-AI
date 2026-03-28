@@ -402,11 +402,20 @@ def predict_latest(df, feature_cols, models, params, pair="USDJPY"):
         if (predicted_dir == 1 and not price_above_sma) or (predicted_dir == 0 and price_above_sma):
             trend_penalty = 0.05  # 逆トレンド時は+5%要求
 
+    # v3.5: ドローダウンベース動的閾値
+    # 損失が深いほど信頼度閾値を引き上げてトレードを絞る（WF実験: PF 1.19→1.57, MDD -36%→-20%）
+    dd_penalty = 0.0
+    if risk_manager is not None:
+        current_dd = risk_manager._current_drawdown()
+        dd_penalty = min(current_dd * 2.0, 0.15)  # DDの2倍を加算、最大+15%
+
     # 自信度フィルター
     confidence = max(proba[1], 1.0 - proba[1])
-    if confidence < CONFIDENCE_THRESHOLD + trend_penalty:
+    effective_threshold = CONFIDENCE_THRESHOLD + trend_penalty + dd_penalty
+    if confidence < effective_threshold:
         result["action"] = "SKIP"
-        result["reason"] = f"自信不足 ({confidence:.1%} < {CONFIDENCE_THRESHOLD:.0%})"
+        dd_str = f" +DD{dd_penalty:.0%}" if dd_penalty > 0 else ""
+        result["reason"] = f"自信不足 ({confidence:.1%} < {CONFIDENCE_THRESHOLD:.0%}{dd_str})"
         result["confidence"] = float(confidence)
         result["agreement"] = agreement
         return result
