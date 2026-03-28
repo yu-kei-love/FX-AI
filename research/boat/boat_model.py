@@ -129,19 +129,33 @@ WIND_DIR_MAP = {
 
 
 # =============================================================
-# データ生成
+# データ生成（合成データは廃止・実データのみ使用）
 # =============================================================
+
+# ⚠️ generate_training_data() は完全削除済み
+# 理由：合成データはカンニングと同じ構造。
+#       1号艇55%というルールで生成したデータを
+#       モデルが学習するだけで、実レースでは通用しない。
+#       実データ（scraper_historical.py で取得）のみを使用する。
+#
+# → 実データは data/boat/boatrace.db に保存される
+# → load_real_data_from_db() を使用してください
 
 def generate_training_data(n_races=10000, seed=42):
     """
-    リアルな統計特性を持つボートレースデータを生成する。
-
-    実際のデータの特徴:
-    - 1号艇が約55%勝つ
-    - A1級選手が1号艇なら約65%、B2級なら約35%
-    - モーター性能は勝率に5-10%影響
-    - 風速・天候がベテラン有利に働く
+    [廃止] 合成データ生成は廃止されました。
+    実データのみ使用してください。
+    → scraper_historical.py で過去データを取得してください
     """
+    raise NotImplementedError(
+        "合成データ生成は廃止されました。\n"
+        "実データを使用してください：\n"
+        "  python research/boat/scraper_historical.py --resume\n"
+        "実データ読み込み：\n"
+        "  load_real_data_from_db()"
+    )
+
+    # 以下は廃止コード（参照のみ・実行されない）
     rng = np.random.RandomState(seed)
 
     rows = []
@@ -1676,12 +1690,15 @@ def run_pipeline():
     print("5+3モデルアンサンブル (Win+Place) + 40+特徴量 + Kelly Criterion")
     print("=" * 60)
 
-    # 1. データ読込（リアルデータ優先）
+    # 1. データ読込（実データのみ）
     print("\n[1/5] データ読込...")
     df = load_real_data()
     if df is None:
-        print("[FALLBACK] リアルデータなし -> 合成データで実行")
-        df = generate_training_data(n_races=10000)
+        print("[エラー] 実データが見つかりません。")
+        print("  → python research/boat/scraper_historical.py --resume")
+        print("  を実行して過去データを取得してください。")
+        print("  合成データは廃止されました（実レースでは通用しないため）。")
+        return
 
     # 2. 特徴量エンジニアリング
     print(f"\n[2/5] 特徴量エンジニアリング ({len(FEATURE_COLS)}特徴量)...")
