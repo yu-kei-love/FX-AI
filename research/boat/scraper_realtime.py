@@ -200,20 +200,28 @@ def fetch_start_exhibition(venue_code, race_no, date_str, db_path=None):
     exhibition_sts = {}
 
     try:
-        # スタート展示テーブル: 進入順が示されている
-        tables = soup.find_all("table")
-        for table in tables:
+        # スタート展示テーブル: 各行が1コースに対応（1行1セル構造）
+        # Row 0: ヘッダ, Row 1: コース1, ..., Row 6: コース6
+        # セル内テキスト先頭が艇番、".XX"がST
+        st_table = soup.find("table", class_="is-h292__3rdadd")
+        if st_table is None:
+            st_table = soup.find("table", class_=re.compile("is-h292"))
+        tables_to_check = [st_table] if st_table else soup.find_all("table")
+
+        for table in tables_to_check:
             rows = table.find_all("tr")
-            for row in rows:
+            for row_idx, row in enumerate(rows):
+                if row_idx == 0:
+                    continue  # ヘッダ行をスキップ
+                course = row_idx  # 行インデックス=コース番号
                 tds = row.find_all("td")
-                for col_idx, td in enumerate(tds):
+                for td in tds:
                     text = td.get_text(strip=True)
                     # "1.16" 形式 → 艇番=1, ST=0.16
                     m = re.match(r"([1-6])\.(\d{2})", text[:4])
                     if m:
                         lane = int(m.group(1))
                         st_val = float(f"0.{m.group(2)}")
-                        course = col_idx + 1
                         if 1 <= course <= 6 and 1 <= lane <= 6:
                             course_taken[lane] = course
                             exhibition_sts[lane] = st_val

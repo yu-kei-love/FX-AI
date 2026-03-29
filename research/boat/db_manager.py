@@ -305,6 +305,12 @@ def insert_entry(entry_data, db_path=None):
         entry_data (dict): entries テーブルに対応するデータ
     """
     with get_conn(db_path) as conn:
+        rid = entry_data.get("racer_id")
+        if rid:
+            conn.execute(
+                "INSERT OR IGNORE INTO racers (racer_id, racer_name) VALUES (?, ?)",
+                (rid, entry_data.get("racer_name")),
+            )
         conn.execute("""
             INSERT OR REPLACE INTO entries
             (race_id, lane, course_taken, racer_id, racer_name,
@@ -332,6 +338,14 @@ def insert_entries_batch(entries, db_path=None):
     if not entries:
         return
     with get_conn(db_path) as conn:
+        # racer_id が存在する場合は racers テーブルに先に挿入（FK 制約を満たすため）
+        for entry_data in entries:
+            rid = entry_data.get("racer_id")
+            if rid:
+                conn.execute(
+                    "INSERT OR IGNORE INTO racers (racer_id, racer_name) VALUES (?, ?)",
+                    (rid, entry_data.get("racer_name")),
+                )
         for entry_data in entries:
             conn.execute("""
                 INSERT OR REPLACE INTO entries

@@ -8,3 +8,17 @@ mlruns/
 *.pt
 *.joblib
 node_modules/
+
+# データベース（実データ）
+*.db
+
+# 生データ
+data/raw/
+
+# モデルの重み
+*.pth
+*.h5
+
+# IDE
+.vscode/
+.idea/

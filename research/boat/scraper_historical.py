@@ -109,8 +109,8 @@ def _get_soup(url, retries=3, timeout=20):
 
 
 def _polite_sleep():
-    """サーバー負荷配慮のスリープ（2〜3秒）。"""
-    time.sleep(2.0 + random.random())
+    """サーバー負荷配慮のスリープ（1〜2秒）。"""
+    time.sleep(1.0 + random.random())
 
 
 def _safe_float(text, default=None):
@@ -365,9 +365,13 @@ def fetch_race_result_and_course(venue_code, race_no, date_str):
 
         # --- スタートタイミング表 → 進入コース取得 ---
         # HTML構造: class="is-h292__3rdadd" のテーブル
-        # ヘッダ行: コース 1 | コース 2 | ... | コース 6
-        # データ行: 艇番.タイミング 形式 "1.16", "3.18" など
-        # → カラム位置がコース番号、値の整数部が艇番
+        # 実際の構造: 各行が1コースに対応（1行1セル）
+        #   Row 0: ヘッダ "スタート情報"
+        #   Row 1: コース1の艇 → セル内テキスト "艇番.ST" 形式
+        #   Row 2: コース2の艇
+        #   ...
+        #   Row 6: コース6の艇
+        # → 行インデックス（ヘッダ除く）がコース番号、テキスト先頭の整数が艇番
         st_table = soup.find("table", class_="is-h292__3rdadd")
         if st_table is None:
             # 別のクラスを試す
@@ -375,18 +379,20 @@ def fetch_race_result_and_course(venue_code, race_no, date_str):
 
         if st_table:
             rows = st_table.find_all("tr")
-            for row in rows:
+            for row_idx, row in enumerate(rows):
+                if row_idx == 0:
+                    continue  # ヘッダ行をスキップ
+                course = row_idx  # 行インデックス=コース番号（1〜6）
                 tds = row.find_all("td")
                 if not tds:
                     tds = row.find_all("th")
-                for col_idx, td in enumerate(tds):
+                for td in tds:
                     text = td.get_text(strip=True)
                     # "1.16" 形式 → 艇番=1, ST=0.16
                     m = re.match(r"([1-6])\.(\d{2})", text[:4])
                     if m:
                         lane = int(m.group(1))
                         st_val = float(f"0.{m.group(2)}")
-                        course = col_idx + 1   # 列インデックス=コース番号（1〜6）
                         if 1 <= course <= 6 and 1 <= lane <= 6:
                             result["course_taken"][lane] = course
                             result["start_timings"][lane] = st_val
