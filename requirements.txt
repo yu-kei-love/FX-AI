@@ -41,3 +41,8 @@ python-telegram-bot>=20.0
 
 # スケジューラ
 schedule>=1.2
+
+# ユーティリティ
+tqdm>=4.66
+matplotlib>=3.8
+sqlalchemy>=2.0
