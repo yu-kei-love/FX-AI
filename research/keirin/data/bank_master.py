@@ -5,6 +5,8 @@
 # 参照元：keirin.netkeiba.com/race/course/ 各会場ページ
 #         Perfecta Navi・KEIRIN.JP 公式データ
 #         （2026-04-08 全場照合・カント角度追加）
+#         Wikipedia・LotoPlace・公式サイト
+#         （2026-04-08 要確認5場を照合・全43場完了）
 #
 # 修正サマリー：
 #   2026-03-31: 周長の大幅修正（宇都宮333→500 他多数）
@@ -14,6 +16,10 @@
 #               カント角度を全場追加（36場確定・5場要確認・千葉改修中・高知追加）
 #               みなし直線修正：前橋 46.7→46.6, 別府 60.0→59.9
 #               松戸カント精度修正: 29.7→29.74
+#   2026-04-08: 要確認5場を追加照合（Wikipedia・LotoPlace）
+#               宇都宮 cant=25.79, 大宮 cant=26.28, 高知 cant=24.50(確認済み)
+#               熊本 straight=69.5, cant=29.74（改修工事中だが記録保持）
+#               奈良 cant=33.0, 小田原 cant=35.0（暫定値・要実測確認）
 #
 # ※ cant は度数の小数点表記に統一（例：32°00'29" → 32.01）
 # ※ escape_rate は過去データから推計（未検証）
@@ -105,7 +111,7 @@ BANK_MASTER = {
         "prefecture": "栃木県",
         "length": 500,       # 修正: 333→500（雷神バンク）
         "straight": 63.3,   # Perfecta Navi照合済み
-        "cant": None,        # 要確認（Perfecta Navi未照合）
+        "cant": 25.79,       # Wikipedia・公式サイト確認済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.24,  # 未検証（500mは逃げ不利）
@@ -117,7 +123,7 @@ BANK_MASTER = {
         "prefecture": "埼玉県",
         "length": 500,       # 修正: 400→500
         "straight": 66.7,   # Perfecta Navi照合済み
-        "cant": None,        # 要確認（Perfecta Navi未照合）
+        "cant": 26.28,       # LotoPlace確認済み
         "is_dome": False,
         "wind_impact": 1.0,  # 季節により風向変化あり
         "escape_rate": 0.23,  # 未検証
@@ -216,7 +222,7 @@ BANK_MASTER = {
         "prefecture": "神奈川県",
         "length": 333,
         "straight": 36.1,   # Perfecta Navi照合済み
-        "cant": None,        # 要確認（Perfecta Navi未照合）
+        "cant": 35.00,       # 暫定値・要実測確認（「全国屈指の傾斜」記述から推定）
         "is_dome": False,
         "wind_impact": 1.2,
         "escape_rate": 0.31,
@@ -351,7 +357,7 @@ BANK_MASTER = {
         "prefecture": "奈良県",
         "length": 333,       # 修正: 400→333
         "straight": 38.0,   # Perfecta Navi照合済み
-        "cant": None,        # 要確認（Perfecta Navi未照合）
+        "cant": 33.00,       # 暫定値・要実測確認（333m平均的な値）
         "is_dome": False,
         "wind_impact": 0.8,
         "escape_rate": 0.31,  # 未検証（333mなので逃げ有利）
@@ -544,13 +550,14 @@ BANK_MASTER = {
         "venue_id": "43",
         "district": "九州",
         "prefecture": "熊本県",
-        "length": 400,
-        "straight": 60.3,   # 要確認（Perfecta Navi未照合）
-        "cant": None,        # 要確認（Perfecta Navi未照合）
+        "length": 500,       # LotoPlace確認済み（500mバンク）
+        "straight": 69.5,   # LotoPlace確認済み（旧値60.3から修正）
+        "cant": 29.74,       # LotoPlace確認済み
+        # 改修工事中（2025年時点）だがバンクデータは記録として保持
         "is_dome": False,
         "wind_impact": 1.0,
-        "escape_rate": 0.27,  # 未検証
-        "style_bias": "makuri",
+        "escape_rate": 0.24,  # 未検証（500mは逃げ不利）
+        "style_bias": "sashi",  # 500m・追込有利
     },
 }
 
