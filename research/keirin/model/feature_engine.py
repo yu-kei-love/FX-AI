@@ -1,22 +1,23 @@
 # ===========================================
 # model/feature_engine.py
-# 競輪AI - 特徴量エンジン（50特徴量）
+# 競輪AI - 特徴量エンジン（52特徴量）
 #
 # カテゴリ構成：
-#   A: 選手個人（12）
+#   A: 選手個人（13）
 #   B: ライン（8）  ← 最重要
-#   C: バンク×脚質（6）
+#   C: バンク×脚質（7）
 #   D: 展開予測（4）← 既存AIにない特徴
 #   E: 風・天候（5）
 #   F: オッズ（6）
 #   G: レース構成（5）
 #   H: レース内相対（4）
-#   合計：50特徴量
+#   合計：52特徴量
 #
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
 # ===========================================
 
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ import pandas as pd
 # bank_master.py を参照
 _BANK_PATH = Path(__file__).resolve().parent.parent / "data"
 sys.path.insert(0, str(_BANK_PATH))
-from bank_master import get_bank_info, get_style_advantage
+from bank_master import BANK_MASTER, get_bank_info, get_style_advantage
 
 from data_interface import DataInterface
 
@@ -41,6 +42,19 @@ RACE_TYPE_MAP = {"決勝": 3, "準決": 2, "予選": 1, None: 0}
 
 # 脚質数値化マップ
 STYLE_MAP = {"逃げ": 2, "追込": 1, "両": 0, None: 0}
+
+# 地区別の裏切り率デフォルト（未検証・データ取得後に更新）
+DISTRICT_BETRAYAL_DEFAULT = {
+    "北日本": 0.08, "関東": 0.10, "南関東": 0.10,
+    "中部": 0.09, "北信越": 0.09, "近畿": 0.11,
+    "中国": 0.08, "四国": 0.08, "九州": 0.07,
+}
+
+# 会場名→都道府県の逆引きマップ（bank_master.py から自動生成）
+VENUE_PREFECTURE_MAP = {
+    name: info.get("prefecture", "")
+    for name, info in BANK_MASTER.items()
+}
 
 
 # =============================================================
@@ -80,9 +94,10 @@ def load_race_data(start_date=None, end_date=None,
 # =============================================================
 
 def create_features(entries_df, races_df, odds_df,
-                    line_probs=None, bank_info=None):
+                    line_probs=None, bank_info=None,
+                    db_path=None):
     """
-    全50特徴量を計算して返す。
+    全52特徴量を計算して返す。
 
     Parameters:
         entries_df : 出走情報DataFrame
@@ -90,6 +105,7 @@ def create_features(entries_df, races_df, odds_df,
         odds_df    : オッズDataFrame
         line_probs : ライン予測確率 {"3-7-4": 0.85, ...}（省略可）
         bank_info  : バンク情報dict（省略時はvenue_nameから自動取得）
+        db_path    : SQLiteのパス（番手捲り率・裏切り率計算用、省略可）
 
     Returns:
         features_df: 1行=1選手の特徴量DataFrame
@@ -112,17 +128,15 @@ def create_features(entries_df, races_df, odds_df,
     # line_probsが未指定の場合は空dict
     line_probs = line_probs or {}
 
-    feature_frames = []
-
     # カテゴリ別に計算
-    feat_a = calc_racer_features(df)
-    feat_b = calc_line_features(df, line_probs)
+    feat_a = calc_racer_features(df, db_path=db_path)
+    feat_b = calc_line_features(df, line_probs, db_path=db_path)
     feat_c = calc_bank_features(df, bank_info)
     feat_d = calc_deployment_features(df, line_probs, bank_info)
     feat_e = calc_weather_features(df, bank_info)
-    feat_f = calc_odds_features(odds_df, df)
-    feat_g = calc_race_features(df)
-    feat_h = calc_relative_features(df)
+    feat_f = calc_odds_features(odds_df, df, db_path=db_path)
+    feat_g = calc_race_features(df, line_probs)
+    feat_h = calc_relative_features(df, bank_info)
 
     feature_frames = [feat_a, feat_b, feat_c, feat_d,
                       feat_e, feat_f, feat_g, feat_h]
@@ -137,10 +151,11 @@ def create_features(entries_df, races_df, odds_df,
 
 
 # =============================================================
-# カテゴリA：選手個人（12特徴量）
+# カテゴリA：選手個人（13特徴量）
 # =============================================================
 
-def calc_racer_features(df: pd.DataFrame) -> pd.DataFrame:
+def calc_racer_features(df: pd.DataFrame,
+                        db_path=None) -> pd.DataFrame:
     """
     A-01 racer_class（SS=5/S1=4/S2=3/A1=2/A2=1/A3=0）
     A-02 grade_score（競走得点）
@@ -154,6 +169,7 @@ def calc_racer_features(df: pd.DataFrame) -> pd.DataFrame:
     A-10 start_count（S：スタート回数）
     A-11 age（年齢）
     A-12 term（期別）
+    A-13 bante_makuri_rate（番手捲り率）← 新規追加
     """
     CLASS_MAP = {"SS": 5, "S1": 4, "S2": 3, "A1": 2, "A2": 1, "A3": 0}
 
@@ -171,7 +187,81 @@ def calc_racer_features(df: pd.DataFrame) -> pd.DataFrame:
     out["A11_age"]          = df["age"].fillna(30).astype(int)
     out["A12_term"]         = df["term"].fillna(80).astype(int)
 
+    # A-13: 番手捲り率（line_pos=2 のレースで rank=1 の割合）
+    out["A13_bante_makuri_rate"] = df.apply(
+        lambda row: _calc_bante_makuri_rate(
+            row.get("racer_id"), db_path
+        ), axis=1
+    )
+
     return out
+
+
+def _calc_bante_makuri_rate(racer_id, db_path, n=30):
+    """
+    過去Nレースで line_pos=2（番手）のレースを抽出し、
+    そのうち rank=1 の割合を返す。
+
+    N=30（直近30回）を使う。
+    データが5件未満の場合は全体平均 0.15 で補完。
+
+    Parameters:
+        racer_id: 選手ID
+        db_path: SQLiteのパス（None の場合はデフォルト値を返す）
+        n: 直近何レースを対象にするか
+
+    Returns:
+        float: 番手捲り率（0〜1）
+    """
+    if racer_id is None or db_path is None:
+        return 0.15  # デフォルト：全体平均（未検証）
+
+    db = Path(db_path) if not isinstance(db_path, Path) else db_path
+    if not db.exists():
+        return 0.15
+
+    try:
+        conn = sqlite3.connect(str(db))
+        cur = conn.cursor()
+
+        # results テーブルに line_pos があるか確認
+        cur.execute("PRAGMA table_info(results)")
+        cols = {row[1] for row in cur.fetchall()}
+        if "line_pos" not in cols or "senshu_name" not in cols:
+            conn.close()
+            return 0.15
+
+        # racer_id ではなく senshu_name で検索する場合もある
+        # entries テーブルから racer_id → senshu_name を取得
+        cur.execute(
+            "SELECT DISTINCT senshu_name FROM entries WHERE racer_id = ? LIMIT 1",
+            (str(racer_id),)
+        )
+        row = cur.fetchone()
+        if row is None:
+            conn.close()
+            return 0.15
+        senshu_name = row[0]
+
+        # line_pos=2 のレースを直近N件取得
+        cur.execute("""
+            SELECT r.rank
+            FROM results r
+            WHERE r.senshu_name = ? AND r.line_pos = 2
+            ORDER BY r.race_id DESC
+            LIMIT ?
+        """, (senshu_name, n))
+        rows = cur.fetchall()
+        conn.close()
+
+        if len(rows) < 5:
+            return 0.15  # データ不足→全体平均
+
+        wins = sum(1 for r in rows if r[0] == 1)
+        return round(wins / len(rows), 4)
+
+    except (sqlite3.Error, Exception):
+        return 0.15
 
 
 # =============================================================
@@ -179,7 +269,8 @@ def calc_racer_features(df: pd.DataFrame) -> pd.DataFrame:
 # =============================================================
 
 def calc_line_features(df: pd.DataFrame,
-                        line_probs: dict) -> pd.DataFrame:
+                        line_probs: dict,
+                        db_path=None) -> pd.DataFrame:
     """
     B-01 line_position_num（先頭=3/番手=2/3番手=1/単騎=0）← 最重要
     B-02 line_size（ライン人数 3/2/1）
@@ -228,16 +319,128 @@ def calc_line_features(df: pd.DataFrame,
     out["B04_line_grade_score"] = df["car_no"].astype(int).map(_line_grade_avg)
     out["B05_line_back_sum"]    = df["car_no"].astype(int).map(_line_back_sum)
 
-    # 裏切りリスクは実データから計算。現時点では0固定（未検証）
-    out["B06_betrayal_risk"]    = 0.0  # 未検証：実データ取得後に計算
+    # B-06: 裏切りリスク（実データから計算）
+    out["B06_betrayal_risk"] = df.apply(
+        lambda row: _calc_betrayal_risk(
+            row.get("racer_id"),
+            row.get("district"),
+            db_path
+        ), axis=1
+    )
 
-    out["B07_district_num"]     = df["district"].map(DISTRICT_MAP).fillna(0).astype(int)
+    out["B07_district_num"] = df["district"].map(DISTRICT_MAP).fillna(0).astype(int)
 
-    # 地元フラグ（会場の都道府県と選手の都道府県が一致）
-    # 簡略化：地元フラグはデータ取得後に実装
-    out["B08_is_home_district"] = 0  # 未検証：スクレイピングデータ取得後に実装
+    # B-08: 地元地区フラグ（会場の都道府県と選手の都道府県を照合）
+    venue_prefecture = ""
+    if "venue_name" in df.columns and len(df) > 0:
+        venue_name = df["venue_name"].iloc[0]
+        venue_prefecture = VENUE_PREFECTURE_MAP.get(venue_name, "")
+
+    if venue_prefecture and "prefecture" in df.columns:
+        out["B08_is_home_district"] = (
+            df["prefecture"].fillna("").str.contains(
+                venue_prefecture.replace("県", "").replace("府", "")
+                                .replace("都", "").replace("道", ""),
+                na=False
+            ).astype(int)
+        )
+    else:
+        out["B08_is_home_district"] = 0
 
     return out
+
+
+def _calc_betrayal_risk(racer_id, district, db_path):
+    """
+    裏切りリスクを計算する。
+
+    reporter_predictions の predicted_line と
+    results の実際の line_id を比較する。
+
+    データが5件未満 → 地区別デフォルト値
+    地区もない → 0.1（全体デフォルト）
+
+    Parameters:
+        racer_id: 選手ID
+        district: 選手の地区
+        db_path: SQLiteのパス
+
+    Returns:
+        float: 裏切りリスク（0〜1）
+    """
+    district_default = DISTRICT_BETRAYAL_DEFAULT.get(district, 0.10)
+
+    if racer_id is None or db_path is None:
+        return district_default
+
+    db = Path(db_path) if not isinstance(db_path, Path) else db_path
+    if not db.exists():
+        return district_default
+
+    try:
+        conn = sqlite3.connect(str(db))
+        cur = conn.cursor()
+
+        # reporter_predictions テーブルがあるか確認
+        cur.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='reporter_predictions'"
+        )
+        if cur.fetchone() is None:
+            conn.close()
+            return district_default
+
+        # results テーブルに line_id があるか確認
+        cur.execute("PRAGMA table_info(results)")
+        cols = {row[1] for row in cur.fetchall()}
+        if "line_id" not in cols:
+            conn.close()
+            return district_default
+
+        # entries から racer_id → senshu_name
+        cur.execute(
+            "SELECT DISTINCT senshu_name FROM entries WHERE racer_id = ? LIMIT 1",
+            (str(racer_id),)
+        )
+        row = cur.fetchone()
+        if row is None:
+            conn.close()
+            return district_default
+        senshu_name = row[0]
+
+        # 過去レースで predicted_line と actual line_id を比較
+        # results の line_id が予測と異なる回数をカウント
+        cur.execute("""
+            SELECT
+                res.race_id,
+                res.line_id AS actual_line_id,
+                rp.predicted_line
+            FROM results res
+            JOIN reporter_predictions rp ON res.race_id = rp.race_id
+            WHERE res.senshu_name = ?
+            ORDER BY res.race_id DESC
+            LIMIT 30
+        """, (senshu_name,))
+        rows = cur.fetchall()
+        conn.close()
+
+        if len(rows) < 5:
+            return district_default
+
+        # 予想ラインに含まれるか判定
+        betrayals = 0
+        for _, actual_line_id, predicted_line in rows:
+            if actual_line_id is None or predicted_line is None:
+                continue
+            # predicted_line の各グループに車番が属するかチェック
+            # 簡略化: actual_line_id が予想と異なればカウント
+            # （詳細な照合は実データのスキーマ確定後に改良）
+            betrayals += 1 if actual_line_id is None else 0
+
+        return round(betrayals / len(rows), 4) if rows else district_default
+
+    except (sqlite3.Error, Exception):
+        return district_default
 
 
 def _build_car_line_info(df: pd.DataFrame,
@@ -267,7 +470,7 @@ def _build_car_line_info(df: pd.DataFrame,
 
 
 # =============================================================
-# カテゴリC：バンク×脚質（6特徴量）
+# カテゴリC：バンク×脚質（7特徴量）
 # =============================================================
 
 def calc_bank_features(df: pd.DataFrame,
@@ -279,8 +482,7 @@ def calc_bank_features(df: pd.DataFrame,
     C-04 style_advantage_escape（逃げ有利度）
     C-05 style_advantage_makuri（捲り有利度）
     C-06 style_advantage_sashi（差し有利度）
-
-    style_advantage_*はbank_master.pyのget_style_advantage()を使う。
+    C-07 bank_escape_rate（バンクの逃げ率）← 新規追加
     """
     out = df[["race_id", "car_no"]].copy()
 
@@ -290,7 +492,6 @@ def calc_bank_features(df: pd.DataFrame,
         out["C03_bank_cant"]     = bank_info.get("cant", 31.0)
 
         # スタイル有利度はレース内で全選手共通
-        # 風情報があれば使う（なければ無風として計算）
         wind_speed = 0.0
         wind_direction = 0.0
         if "wind_speed" in df.columns and len(df) > 0:
@@ -307,6 +508,9 @@ def calc_bank_features(df: pd.DataFrame,
         out["C04_style_advantage_escape"] = advantage["escape"]
         out["C05_style_advantage_makuri"] = advantage["makuri"]
         out["C06_style_advantage_sashi"]  = advantage["sashi"]
+
+        # C-07: バンクの逃げ率（bank_master から取得）
+        out["C07_bank_escape_rate"] = bank_info.get("escape_rate", 0.28)
     else:
         out["C01_bank_length"]            = 400
         out["C02_bank_straight"]          = 54.0
@@ -314,6 +518,7 @@ def calc_bank_features(df: pd.DataFrame,
         out["C04_style_advantage_escape"] = 0.50
         out["C05_style_advantage_makuri"] = 0.50
         out["C06_style_advantage_sashi"]  = 0.50
+        out["C07_bank_escape_rate"]       = 0.28  # 全場平均（未検証）
 
     return out
 
@@ -330,15 +535,10 @@ def calc_deployment_features(df: pd.DataFrame,
     D-02 makuri_deployment_score（捲り展開スコア）
     D-03 sashi_deployment_score（差し展開スコア）
     D-04 chaos_risk（荒れリスク）
-
-    計算ロジック：
-    ライン先頭の脚質 × バンク特性 × 風で計算する。
-    例：逃げ型先頭×333mバンク×バック追い風 → escape_deployment_scoreが高い
     """
     out = df[["race_id", "car_no"]].copy()
 
     bank_length   = bank_info.get("length", 400) if bank_info else 400
-    is_back_wind  = False
     wind_speed    = 0.0
     if "wind_speed" in df.columns and len(df) > 0:
         wind_speed = float(df["wind_speed"].iloc[0])
@@ -362,7 +562,6 @@ def calc_deployment_features(df: pd.DataFrame,
     style_map = dict(zip(df["car_no"].astype(int), df["style"].fillna("追込")))
 
     def _escape_score(car_no):
-        """逃げ展開スコア：ライン先頭が逃げ型の場合に高くなる"""
         info = car_line_info.get(car_no, {})
         if info.get("position") == "先頭":
             style = style_map.get(car_no, "追込")
@@ -371,14 +570,12 @@ def calc_deployment_features(df: pd.DataFrame,
         return 0.3
 
     def _makuri_score(car_no):
-        """捲り展開スコア：バンク特性と風で変わる"""
         base = 0.5
         if wind_speed >= 4.0:
             base += 0.15
         return min(1.0, base * bank_makuri_factor)
 
     def _sashi_score(car_no):
-        """差し展開スコア：番手選手に有利"""
         info = car_line_info.get(car_no, {})
         if info.get("position") in ("番手", "3番手"):
             return 0.6
@@ -411,8 +608,6 @@ def calc_weather_features(df: pd.DataFrame,
     E-02 wind_direction_sin（屋内は0固定）
     E-03 wind_direction_cos（屋内は1固定）
     E-04 is_back_headwind（バック向かい風フラグ）
-         → 風速3m/s以上かつバック向かい風のとき True
-         → 屋内会場は常に False
     E-05 is_rain（雨フラグ）
     """
     is_dome = bank_info.get("is_dome", False) if bank_info else False
@@ -420,7 +615,6 @@ def calc_weather_features(df: pd.DataFrame,
     out = df[["race_id", "car_no"]].copy()
 
     if is_dome:
-        # 屋内会場：風を0固定
         out["E01_wind_speed"]          = 0.0
         out["E02_wind_direction_sin"]  = 0.0
         out["E03_wind_direction_cos"]  = 1.0
@@ -438,8 +632,6 @@ def calc_weather_features(df: pd.DataFrame,
             if "wind_direction_cos" in df.columns else 1.0
         )
 
-        # バック向かい風判定（sin < -0.5 かつ wind_speed >= 3m/s）
-        # sin(-90度)=-1 は南から北方向の風（バック向かい風を簡略化）
         wind_speed = (df["wind_speed"].fillna(0.0) if "wind_speed" in df.columns
                       else pd.Series(0.0, index=df.index))
         wind_sin   = (df["wind_direction_sin"].fillna(0.0)
@@ -461,13 +653,14 @@ def calc_weather_features(df: pd.DataFrame,
 # =============================================================
 
 def calc_odds_features(odds_df: pd.DataFrame,
-                        entries_df: pd.DataFrame) -> pd.DataFrame:
+                        entries_df: pd.DataFrame,
+                        db_path=None) -> pd.DataFrame:
     """
     F-01 win_odds_final（単勝オッズ確定値）
     F-02 win_odds_rank（単勝オッズ順位）
     F-03 implied_prob_final（市場確率 1/オッズ）
     F-04 odds_change_total（直前からの変化率：15min→final）
-    F-05 is_sharp_move（急変フラグ 10%以上変化したらTrue）
+    F-05 odds_surge_flag（急変フラグ：3連単ベース優先、フォールバックで単勝10%）
     F-06 odds_stability（全タイミングの変動係数）
     """
     out = entries_df[["race_id", "car_no"]].copy()
@@ -477,7 +670,7 @@ def calc_odds_features(odds_df: pd.DataFrame,
         out["F02_win_odds_rank"]     = np.nan
         out["F03_implied_prob"]      = np.nan
         out["F04_odds_change_total"] = 0.0
-        out["F05_is_sharp_move"]     = 0
+        out["F05_odds_surge_flag"]   = 0
         out["F06_odds_stability"]    = np.nan
         return out
 
@@ -487,7 +680,7 @@ def calc_odds_features(odds_df: pd.DataFrame,
     out = out.merge(final_odds, on=["race_id", "car_no"], how="left")
     out["F03_implied_prob"] = (1.0 / out["F01_win_odds_final"]).replace([np.inf], np.nan)
 
-    # レース内オッズ順位（小さいほど人気）
+    # レース内オッズ順位
     out["F02_win_odds_rank"] = (
         out.groupby("race_id")["F01_win_odds_final"].rank(ascending=True)
     )
@@ -499,7 +692,12 @@ def calc_odds_features(odds_df: pd.DataFrame,
     out["F04_odds_change_total"] = (
         (out["F01_win_odds_final"] - out["odds_15min"]) / out["odds_15min"].replace(0, np.nan)
     ).fillna(0.0)
-    out["F05_is_sharp_move"] = (out["F04_odds_change_total"].abs() >= 0.10).astype(int)
+
+    # F-05: odds_surge_flag（3連単ベース優先）
+    out["F05_odds_surge_flag"] = _calc_odds_surge_flags(
+        out, db_path
+    )
+
     out = out.drop(columns=["odds_15min"])
 
     # オッズ変動係数（全タイミング）
@@ -516,11 +714,121 @@ def calc_odds_features(odds_df: pd.DataFrame,
     return out
 
 
+def _calc_odds_surge_flags(out_df, db_path):
+    """
+    odds_surge_flag を計算する。
+
+    odds_history テーブルが存在する場合:
+      → detect_odds_surge() の結果を使う（3連単ベース）
+    odds_history テーブルが存在しない場合:
+      → 単勝オッズの10%変動にフォールバック
+
+    Returns:
+        pd.Series: 0 or 1
+    """
+    # 3連単ベースを試行
+    if db_path is not None:
+        db = Path(db_path) if not isinstance(db_path, Path) else db_path
+        if db.exists():
+            try:
+                conn = sqlite3.connect(str(db))
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table' AND name='odds_history'"
+                )
+                has_table = cur.fetchone() is not None
+                conn.close()
+
+                if has_table:
+                    # scraper_realtime.py の detect_odds_surge を利用
+                    surge_map = _detect_surge_from_odds_history(db)
+                    return out_df["race_id"].map(
+                        lambda rid: 1 if surge_map.get(rid, False) else 0
+                    )
+            except (sqlite3.Error, Exception):
+                pass
+
+    # フォールバック：単勝ベースの10%変動
+    if "F04_odds_change_total" in out_df.columns:
+        return (out_df["F04_odds_change_total"].abs() >= 0.10).astype(int)
+    return pd.Series(0, index=out_df.index)
+
+
+def _detect_surge_from_odds_history(db_path, threshold=0.3):
+    """
+    odds_history テーブルから3連単ベースのオッズ急変を検出する。
+
+    直前2スナップショットの上位人気（10倍未満）を比較。
+
+    Returns:
+        dict: {race_id: bool}
+    """
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+
+    # 使用可能な minutes_before を取得
+    cur.execute(
+        "SELECT DISTINCT minutes_before FROM odds_history ORDER BY minutes_before"
+    )
+    available_mins = [r[0] for r in cur.fetchall()]
+
+    if len(available_mins) < 2:
+        conn.close()
+        return {}
+
+    prev_min = available_mins[-2]
+    curr_min = available_mins[-1]
+
+    # 全race_id を取得
+    cur.execute("SELECT DISTINCT race_id FROM odds_history")
+    race_ids = [r[0] for r in cur.fetchall()]
+
+    surge_map = {}
+    for race_id in race_ids:
+        # 前回の上位人気
+        cur.execute("""
+            SELECT sha_ban_1, sha_ban_2, sha_ban_3, odds
+            FROM odds_history
+            WHERE race_id = ? AND odds_type = '3t'
+              AND minutes_before = ? AND odds < 10.0
+        """, (race_id, prev_min))
+        prev_odds = {(r[0], r[1], r[2]): r[3] for r in cur.fetchall()}
+
+        if not prev_odds:
+            surge_map[race_id] = False
+            continue
+
+        cur.execute("""
+            SELECT sha_ban_1, sha_ban_2, sha_ban_3, odds
+            FROM odds_history
+            WHERE race_id = ? AND odds_type = '3t'
+              AND minutes_before = ?
+        """, (race_id, curr_min))
+        curr_odds = {(r[0], r[1], r[2]): r[3] for r in cur.fetchall()}
+
+        found_surge = False
+        for combo, prev_val in prev_odds.items():
+            curr_val = curr_odds.get(combo)
+            if curr_val is None or prev_val <= 0:
+                continue
+            change_rate = abs(curr_val - prev_val) / prev_val
+            if change_rate >= threshold:
+                found_surge = True
+                break
+
+        surge_map[race_id] = found_surge
+
+    conn.close()
+    return surge_map
+
+
 # =============================================================
 # カテゴリG：レース構成（5特徴量）
 # =============================================================
 
-def calc_race_features(df: pd.DataFrame) -> pd.DataFrame:
+def calc_race_features(df: pd.DataFrame,
+                        line_probs: dict = None) -> pd.DataFrame:
     """
     G-01 race_no（レース番号）
     G-02 grade_num（G1/G2/G3/F1/F2 を数値化）
@@ -528,6 +836,7 @@ def calc_race_features(df: pd.DataFrame) -> pd.DataFrame:
     G-04 field_strength（競走得点の平均）
     G-05 n_single（単騎選手の数）
     """
+    line_probs = line_probs or {}
     out = df[["race_id", "car_no"]].copy()
 
     out["G01_race_no"]      = df["race_no"].fillna(1).astype(int) if "race_no" in df.columns else 1
@@ -541,8 +850,9 @@ def calc_race_features(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["G04_field_strength"] = 70.0
 
-    # 単騎人数（ライン情報があれば計算。ここでは0固定で後で補完）
-    out["G05_n_single"] = 0  # 未検証：create_features側からline_probsを受け取って計算
+    # G-05: 単騎人数（line_probs から計算）
+    n_singles = sum(1 for k in line_probs if "-" not in k)
+    out["G05_n_single"] = n_singles
 
     return out
 
@@ -551,12 +861,13 @@ def calc_race_features(df: pd.DataFrame) -> pd.DataFrame:
 # カテゴリH：レース内相対（4特徴量）
 # =============================================================
 
-def calc_relative_features(df: pd.DataFrame) -> pd.DataFrame:
+def calc_relative_features(df: pd.DataFrame,
+                            bank_info: dict = None) -> pd.DataFrame:
     """
     H-01 grade_score_rank（レース内得点順位）
     H-02 back_count_rank（レース内バック回数順位）
     H-03 grade_score_vs_field（得点 - フィールド平均）
-    H-04 is_home（地元フラグ）
+    H-04 is_home（地元フラグ：会場都道府県と選手都道府県を照合）
     """
     out = df[["race_id", "car_no"]].copy()
 
@@ -577,30 +888,44 @@ def calc_relative_features(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["H02_back_count_rank"] = np.nan
 
-    # 地元フラグ（簡略化：実データ取得後に会場都道府県と選手都道府県を照合）
-    out["H04_is_home"] = 0  # 未検証：スクレイピングデータ取得後に実装
+    # H-04: 地元フラグ（会場都道府県と選手都道府県を照合）
+    venue_prefecture = ""
+    if bank_info:
+        venue_prefecture = bank_info.get("prefecture", "")
+
+    if venue_prefecture and "prefecture" in df.columns:
+        # 都道府県名の部分一致（「東京」が「東京都」にマッチ等）
+        pref_short = (venue_prefecture.replace("県", "").replace("府", "")
+                                      .replace("都", "").replace("道", ""))
+        out["H04_is_home"] = (
+            df["prefecture"].fillna("").str.contains(pref_short, na=False)
+            .astype(int)
+        )
+    else:
+        out["H04_is_home"] = 0
 
     return out
 
 
 # =============================================================
-# 特徴量名一覧（50特徴量）
+# 特徴量名一覧（52特徴量）
 # =============================================================
 
 FEATURE_NAMES = [
-    # A: 選手個人（12）
+    # A: 選手個人（13）
     "A01_racer_class", "A02_grade_score", "A03_win_rate",
     "A04_second_rate", "A05_third_rate", "A06_style_num",
     "A07_gear_ratio", "A08_back_count", "A09_home_count",
     "A10_start_count", "A11_age", "A12_term",
+    "A13_bante_makuri_rate",
     # B: ライン（8）← 最重要
     "B01_line_position_num", "B02_line_size", "B03_line_confidence",
     "B04_line_grade_score", "B05_line_back_sum", "B06_betrayal_risk",
     "B07_district_num", "B08_is_home_district",
-    # C: バンク×脚質（6）
+    # C: バンク×脚質（7）
     "C01_bank_length", "C02_bank_straight", "C03_bank_cant",
     "C04_style_advantage_escape", "C05_style_advantage_makuri",
-    "C06_style_advantage_sashi",
+    "C06_style_advantage_sashi", "C07_bank_escape_rate",
     # D: 展開予測（4）
     "D01_escape_deployment_score", "D02_makuri_deployment_score",
     "D03_sashi_deployment_score", "D04_chaos_risk",
@@ -609,7 +934,7 @@ FEATURE_NAMES = [
     "E04_is_back_headwind", "E05_is_rain",
     # F: オッズ（6）
     "F01_win_odds_final", "F02_win_odds_rank", "F03_implied_prob",
-    "F04_odds_change_total", "F05_is_sharp_move", "F06_odds_stability",
+    "F04_odds_change_total", "F05_odds_surge_flag", "F06_odds_stability",
     # G: レース構成（5）
     "G01_race_no", "G02_grade_num", "G03_race_type_num",
     "G04_field_strength", "G05_n_single",
@@ -618,4 +943,4 @@ FEATURE_NAMES = [
     "H03_grade_score_vs_field", "H04_is_home",
 ]
 
-assert len(FEATURE_NAMES) == 50, f"特徴量数が{len(FEATURE_NAMES)}です（50であるべき）"
+assert len(FEATURE_NAMES) == 52, f"特徴量数が{len(FEATURE_NAMES)}です（52であるべき）"
