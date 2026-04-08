@@ -3,22 +3,23 @@
 # 競輪 全43会場 バンクデータ（固定値）
 #
 # 参照元：keirin.netkeiba.com/race/course/ 各会場ページ
-#         （2026-03-31 照合・修正）
+#         Perfecta Navi・KEIRIN.JP 公式データ
+#         （2026-04-08 全場照合・カント角度追加）
 #
-# 修正サマリー（Perfecta Navi照合）：
-#   周長の大幅修正：宇都宮 333→500, 大宮 400→500, 平塚 500→400,
-#                   静岡 500→400, 大垣 333→400, 奈良 400→333,
-#                   小松島 333→400, 高知 400→500,
-#                   小倉 333→400, 別府 333→400
-#   廃止会場を削除：郡山（2013年廃止）・浜松（2022年廃止）・福岡（2011年廃止）
-#   新規追加：弥彦, 四日市
-#   改修中：千葉（500m→250m木製バンク工事中・2026年時点で無開催）
+# 修正サマリー：
+#   2026-03-31: 周長の大幅修正（宇都宮333→500 他多数）
+#               廃止会場削除（郡山・浜松・福岡）
+#               新規追加（弥彦・四日市）
+#   2026-04-08: Perfecta Navi照合
+#               カント角度を全場追加（36場確定・5場要確認・千葉改修中・高知追加）
+#               みなし直線修正：前橋 46.7→46.6, 別府 60.0→59.9
+#               松戸カント精度修正: 29.7→29.74
 #
-# ※ cant は一部会場のみ公式値、未記載会場は未検証（None）
+# ※ cant は度数の小数点表記に統一（例：32°00'29" → 32.01）
 # ※ escape_rate は過去データから推計（未検証）
 # ※ wind_impact は会場の地理的特性に基づく主観的スコア（1.0=標準）
 #
-# 会場数：43（北日本3・関東8・南関東7・中部7・北信越1・
+# 会場数：43（北日本3・関東8・南関東7・中部7・北信越2・
 #             近畿4・中国3・四国4・九州6 ＋千葉は改修中）
 # ===========================================
 
@@ -30,20 +31,20 @@ BANK_MASTER = {
         "district": "北日本",
         "prefecture": "北海道",
         "length": 400,
-        "straight": 51.3,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 51.3,   # Perfecta Navi照合済み
+        "cant": 30.61,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.2,  # 海沿い・海風あり
         "escape_rate": 0.28,  # 未検証
-        "style_bias": "escape",  # 標準バンク・脚質差なし
+        "style_bias": "escape",
     },
     "青森": {
         "venue_id": "02",
         "district": "北日本",
         "prefecture": "青森県",
         "length": 400,
-        "straight": 58.9,   # netkeiba確認
-        "cant": None,        # 未取得（「ややきつめ」との記述）
+        "straight": 58.9,   # Perfecta Navi照合済み
+        "cant": 32.25,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.2,  # 強風多い
         "escape_rate": 0.27,  # 未検証
@@ -54,8 +55,8 @@ BANK_MASTER = {
         "district": "北日本",
         "prefecture": "福島県",
         "length": 400,
-        "straight": 62.7,   # netkeiba確認（400m中第3位の直線長さ）
-        "cant": None,        # 未取得
+        "straight": 62.7,   # Perfecta Navi照合済み（400m中第3位の直線長さ）
+        "cant": 32.92,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,  # ポリカーボネート囲いで風が逃げにくい
         "escape_rate": 0.26,  # 未検証
@@ -67,8 +68,8 @@ BANK_MASTER = {
         "district": "北日本",  # 新潟は北日本地区に分類
         "prefecture": "新潟県",
         "length": 400,
-        "straight": 63.1,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 63.1,   # Perfecta Navi照合済み
+        "cant": 32.40,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
@@ -79,8 +80,8 @@ BANK_MASTER = {
         "district": "関東",
         "prefecture": "群馬県",
         "length": 335,
-        "straight": 46.7,   # netkeiba確認（旧値43.0から修正）
-        "cant": 36.0,        # netkeiba確認「36度・国内トップクラス」
+        "straight": 46.6,   # Perfecta Navi照合済み（旧値46.7から修正）
+        "cant": 36.00,       # Perfecta Navi照合済み（国内トップクラス）
         "is_dome": True,     # 屋内（確認済み）
         "wind_impact": 0.0,  # 屋内なので風影響なし
         "escape_rate": 0.32,
@@ -91,8 +92,8 @@ BANK_MASTER = {
         "district": "関東",
         "prefecture": "茨城県",
         "length": 400,
-        "straight": 54.8,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 54.8,   # Perfecta Navi照合済み
+        "cant": 31.51,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -103,8 +104,8 @@ BANK_MASTER = {
         "district": "関東",
         "prefecture": "栃木県",
         "length": 500,       # 修正: 333→500（雷神バンク）
-        "straight": 63.3,   # netkeiba確認
-        "cant": None,        # 未取得（「フラットバンク」との記述）
+        "straight": 63.3,   # Perfecta Navi照合済み
+        "cant": None,        # 要確認（Perfecta Navi未照合）
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.24,  # 未検証（500mは逃げ不利）
@@ -115,8 +116,8 @@ BANK_MASTER = {
         "district": "関東",
         "prefecture": "埼玉県",
         "length": 500,       # 修正: 400→500
-        "straight": 66.7,   # netkeiba確認
-        "cant": None,        # 未取得（「深い」との記述）
+        "straight": 66.7,   # Perfecta Navi照合済み
+        "cant": None,        # 要確認（Perfecta Navi未照合）
         "is_dome": False,
         "wind_impact": 1.0,  # 季節により風向変化あり
         "escape_rate": 0.23,  # 未検証
@@ -127,20 +128,20 @@ BANK_MASTER = {
         "district": "関東",
         "prefecture": "埼玉県",
         "length": 400,
-        "straight": 47.6,   # netkeiba確認（旧値55.0から修正）
-        "cant": None,        # 未取得（「カント緩め」との記述）
+        "straight": 47.6,   # Perfecta Navi照合済み
+        "cant": 29.45,       # Perfecta Navi照合済み（カント緩め）
         "is_dome": False,
         "wind_impact": 0.8,
         "escape_rate": 0.31,  # 未検証
-        "style_bias": "escape",  # 「333mバンクに近い性格・逃げ有利」（明示確認）
+        "style_bias": "escape",  # 「333mバンクに近い性格・逃げ有利」
     },
     "京王閣": {
         "venue_id": "10",
         "district": "関東",
         "prefecture": "東京都",
         "length": 400,
-        "straight": 51.5,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 51.5,   # Perfecta Navi照合済み
+        "cant": 32.17,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 0.9,
         "escape_rate": 0.28,  # 未検証
@@ -151,8 +152,8 @@ BANK_MASTER = {
         "district": "関東",
         "prefecture": "東京都",
         "length": 400,
-        "straight": 58.0,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 58.0,   # Perfecta Navi照合済み
+        "cant": 31.22,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -164,8 +165,8 @@ BANK_MASTER = {
         "district": "南関東",
         "prefecture": "千葉県",
         "length": 333,
-        "straight": 38.2,   # netkeiba確認（旧値と一致）
-        "cant": 29.7,        # 旧値維持（未検証）
+        "straight": 38.2,   # Perfecta Navi照合済み
+        "cant": 29.74,       # Perfecta Navi照合済み（旧値29.7を精度修正）
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.30,
@@ -190,8 +191,8 @@ BANK_MASTER = {
         "district": "南関東",
         "prefecture": "神奈川県",
         "length": 400,
-        "straight": 58.0,   # netkeiba確認（旧値52.5から修正）
-        "cant": None,        # 未取得
+        "straight": 58.0,   # Perfecta Navi照合済み
+        "cant": 32.17,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.27,  # 未検証
@@ -202,8 +203,8 @@ BANK_MASTER = {
         "district": "南関東",
         "prefecture": "神奈川県",
         "length": 400,       # 修正: 500→400（湘南バンク）
-        "straight": 54.2,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 54.2,   # Perfecta Navi照合済み
+        "cant": 31.64,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.3,  # 海沿い・川からの強風
         "escape_rate": 0.26,  # 未検証
@@ -214,8 +215,8 @@ BANK_MASTER = {
         "district": "南関東",
         "prefecture": "神奈川県",
         "length": 333,
-        "straight": 36.1,   # netkeiba確認（旧値42.0から修正）
-        "cant": None,        # 未取得
+        "straight": 36.1,   # Perfecta Navi照合済み
+        "cant": None,        # 要確認（Perfecta Navi未照合）
         "is_dome": False,
         "wind_impact": 1.2,
         "escape_rate": 0.31,
@@ -226,8 +227,8 @@ BANK_MASTER = {
         "district": "南関東",
         "prefecture": "静岡県",
         "length": 333,
-        "straight": 46.6,   # netkeiba確認（旧値44.0から修正）
-        "cant": None,        # 未取得
+        "straight": 46.6,   # Perfecta Navi照合済み
+        "cant": 34.69,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.30,
@@ -238,8 +239,8 @@ BANK_MASTER = {
         "district": "中部",
         "prefecture": "静岡県",
         "length": 400,       # 修正: 500→400
-        "straight": 56.4,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 56.4,   # Perfecta Navi照合済み
+        "cant": 30.72,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.2,
         "escape_rate": 0.27,  # 未検証
@@ -251,8 +252,8 @@ BANK_MASTER = {
         "district": "中部",
         "prefecture": "愛知県",
         "length": 400,
-        "straight": 60.3,   # netkeiba確認（旧値55.5から修正）
-        "cant": None,        # 未取得
+        "straight": 60.3,   # Perfecta Navi照合済み
+        "cant": 33.84,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
@@ -263,8 +264,8 @@ BANK_MASTER = {
         "district": "中部",
         "prefecture": "愛知県",
         "length": 400,
-        "straight": 58.8,   # netkeiba確認（旧値57.0から修正）
-        "cant": None,        # 未取得
+        "straight": 58.8,   # Perfecta Navi照合済み
+        "cant": 34.03,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 0.8,
         "escape_rate": 0.28,  # 未検証
@@ -275,8 +276,8 @@ BANK_MASTER = {
         "district": "中部",
         "prefecture": "岐阜県",
         "length": 400,
-        "straight": 59.3,   # netkeiba確認（旧値53.0から修正）
-        "cant": None,        # 未取得
+        "straight": 59.3,   # Perfecta Navi照合済み
+        "cant": 33.25,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
@@ -287,8 +288,8 @@ BANK_MASTER = {
         "district": "中部",
         "prefecture": "岐阜県",
         "length": 400,       # 修正: 333→400
-        "straight": 56.0,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 56.0,   # Perfecta Navi照合済み
+        "cant": 30.62,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -299,8 +300,8 @@ BANK_MASTER = {
         "district": "中部",
         "prefecture": "三重県",
         "length": 400,
-        "straight": 61.5,   # netkeiba確認（旧値53.5から修正）
-        "cant": None,        # 未取得
+        "straight": 61.5,   # Perfecta Navi照合済み
+        "cant": 34.42,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
@@ -310,22 +311,22 @@ BANK_MASTER = {
         "venue_id": "24",
         "district": "中部",
         "prefecture": "三重県",
-        "length": 400,       # 新規追加
-        "straight": 62.4,   # netkeiba確認
-        "cant": None,        # 未取得
+        "length": 400,
+        "straight": 62.4,   # Perfecta Navi照合済み
+        "cant": 32.25,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
         "style_bias": "makuri",
     },
-    # ===== 北信越地区（1会場） =====
+    # ===== 北信越地区（2会場） =====
     "富山": {
         "venue_id": "25",
         "district": "北信越",
         "prefecture": "富山県",
         "length": 333,
-        "straight": 43.0,   # netkeiba確認（旧値44.0とほぼ一致）
-        "cant": None,        # 未取得
+        "straight": 43.0,   # Perfecta Navi照合済み
+        "cant": 33.69,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.31,
@@ -336,8 +337,8 @@ BANK_MASTER = {
         "district": "北信越",
         "prefecture": "福井県",
         "length": 400,
-        "straight": 52.8,   # netkeiba確認（旧値55.0から修正）
-        "cant": None,        # 未取得
+        "straight": 52.8,   # Perfecta Navi照合済み
+        "cant": 31.48,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -349,8 +350,8 @@ BANK_MASTER = {
         "district": "近畿",
         "prefecture": "奈良県",
         "length": 333,       # 修正: 400→333
-        "straight": 38.0,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 38.0,   # Perfecta Navi照合済み
+        "cant": None,        # 要確認（Perfecta Navi未照合）
         "is_dome": False,
         "wind_impact": 0.8,
         "escape_rate": 0.31,  # 未検証（333mなので逃げ有利）
@@ -361,8 +362,8 @@ BANK_MASTER = {
         "district": "近畿",
         "prefecture": "京都府",
         "length": 400,
-        "straight": 47.3,   # netkeiba確認（旧値54.0から修正）
-        "cant": None,        # 未取得
+        "straight": 47.3,   # Perfecta Navi照合済み
+        "cant": 30.49,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 0.9,
         "escape_rate": 0.29,  # 未検証
@@ -373,8 +374,8 @@ BANK_MASTER = {
         "district": "近畿",
         "prefecture": "和歌山県",
         "length": 400,
-        "straight": 59.9,   # netkeiba確認（旧値54.0から修正）
-        "cant": None,        # 未取得
+        "straight": 59.9,   # Perfecta Navi照合済み
+        "cant": 32.25,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.27,  # 未検証
@@ -385,8 +386,8 @@ BANK_MASTER = {
         "district": "近畿",
         "prefecture": "大阪府",
         "length": 400,
-        "straight": 56.7,   # netkeiba確認（旧値55.0から修正）
-        "cant": None,        # 未取得
+        "straight": 56.7,   # Perfecta Navi照合済み
+        "cant": 30.93,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -398,8 +399,8 @@ BANK_MASTER = {
         "district": "中国",
         "prefecture": "岡山県",
         "length": 400,
-        "straight": 47.9,   # netkeiba確認（旧値54.0から修正）
-        "cant": None,        # 未取得
+        "straight": 47.9,   # Perfecta Navi照合済み
+        "cant": 30.62,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.2,  # 海沿い
         "escape_rate": 0.29,  # 未検証
@@ -410,8 +411,8 @@ BANK_MASTER = {
         "district": "中国",
         "prefecture": "広島県",
         "length": 400,
-        "straight": 57.9,   # netkeiba確認（旧値55.0から修正）
-        "cant": None,        # 未取得
+        "straight": 57.9,   # Perfecta Navi照合済み
+        "cant": 30.79,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -422,8 +423,8 @@ BANK_MASTER = {
         "district": "中国",
         "prefecture": "山口県",
         "length": 333,
-        "straight": 42.5,   # netkeiba確認（旧値43.0とほぼ一致）
-        "cant": None,        # 未取得
+        "straight": 42.5,   # Perfecta Navi照合済み
+        "cant": 34.69,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,  # 山に囲まれ風の影響あり
         "escape_rate": 0.30,
@@ -435,8 +436,8 @@ BANK_MASTER = {
         "district": "四国",
         "prefecture": "香川県",
         "length": 400,
-        "straight": 54.8,   # netkeiba確認（旧値54.0とほぼ一致）
-        "cant": None,        # 未取得
+        "straight": 54.8,   # Perfecta Navi照合済み
+        "cant": 33.26,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.28,  # 未検証
@@ -447,8 +448,8 @@ BANK_MASTER = {
         "district": "四国",
         "prefecture": "徳島県",
         "length": 400,       # 修正: 333→400
-        "straight": 55.5,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 55.5,   # Perfecta Navi照合済み
+        "cant": 29.77,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.28,  # 未検証
@@ -459,8 +460,8 @@ BANK_MASTER = {
         "district": "四国",
         "prefecture": "高知県",
         "length": 500,       # 修正: 400→500
-        "straight": 52.0,   # netkeiba確認
-        "cant": None,        # 未取得
+        "straight": 52.0,   # Perfecta Navi照合済み
+        "cant": 24.50,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.24,  # 未検証（500mは逃げ不利）
@@ -471,8 +472,8 @@ BANK_MASTER = {
         "district": "四国",
         "prefecture": "愛媛県",
         "length": 400,
-        "straight": 58.6,   # netkeiba確認（旧値53.0から修正）
-        "cant": None,        # 未取得
+        "straight": 58.6,   # Perfecta Navi照合済み
+        "cant": 34.03,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.28,  # 未検証
@@ -484,8 +485,8 @@ BANK_MASTER = {
         "district": "九州",
         "prefecture": "福岡県",
         "length": 400,       # 修正: 333→400（ミスドームバンク）
-        "straight": 56.9,   # netkeiba確認
-        "cant": None,        # 未取得（旧値37.0は誤り）
+        "straight": 56.9,   # Perfecta Navi照合済み
+        "cant": 34.03,       # Perfecta Navi照合済み（旧値37.0は誤りで削除済み）
         "is_dome": True,     # 屋内（確認済み・無風）
         "wind_impact": 0.0,  # 屋内なので風影響なし
         "escape_rate": 0.30,  # 未検証
@@ -496,8 +497,8 @@ BANK_MASTER = {
         "district": "九州",
         "prefecture": "福岡県",
         "length": 400,
-        "straight": 50.7,   # netkeiba確認（旧値54.5から修正）
-        "cant": None,        # 未取得
+        "straight": 50.7,   # Perfecta Navi照合済み
+        "cant": 31.48,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.29,  # 未検証
@@ -508,8 +509,8 @@ BANK_MASTER = {
         "district": "九州",
         "prefecture": "佐賀県",
         "length": 400,
-        "straight": 64.4,   # netkeiba確認（旧値53.0から修正）
-        "cant": None,        # 未取得
+        "straight": 64.4,   # Perfecta Navi照合済み
+        "cant": 32.01,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.26,  # 未検証（直線長い）
@@ -520,20 +521,20 @@ BANK_MASTER = {
         "district": "九州",
         "prefecture": "長崎県",
         "length": 400,
-        "straight": 40.2,   # netkeiba確認（400m中最短直線）
-        "cant": None,        # 未取得
+        "straight": 40.2,   # Perfecta Navi照合済み（400m中最短直線）
+        "cant": 31.48,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.1,
         "escape_rate": 0.33,  # 未検証（直線最短→逃げ有利）
-        "style_bias": "escape",  # 「400m中最短直線・逃げ有利」（明示確認）
+        "style_bias": "escape",  # 「400m中最短直線・逃げ有利」
     },
     "別府": {
         "venue_id": "42",
         "district": "九州",
         "prefecture": "大分県",
         "length": 400,       # 修正: 333→400
-        "straight": 60.0,   # netkeiba確認（59.96m）
-        "cant": None,        # 未取得
+        "straight": 59.9,   # Perfecta Navi照合済み（旧値60.0から修正）
+        "cant": 33.69,       # Perfecta Navi照合済み
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
@@ -544,8 +545,8 @@ BANK_MASTER = {
         "district": "九州",
         "prefecture": "熊本県",
         "length": 400,
-        "straight": 60.3,   # netkeiba確認（2024-07再開）
-        "cant": None,        # 未取得
+        "straight": 60.3,   # 要確認（Perfecta Navi未照合）
+        "cant": None,        # 要確認（Perfecta Navi未照合）
         "is_dome": False,
         "wind_impact": 1.0,
         "escape_rate": 0.27,  # 未検証
