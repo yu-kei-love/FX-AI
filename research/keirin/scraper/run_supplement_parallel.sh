@@ -50,13 +50,19 @@ if [ ! -f "$DB_PATH" ]; then
     echo "エラー: DB が見つかりません: $DB_PATH"
     exit 1
 fi
+# Git Bash の /c/... 形式を Windows Python が扱える C:/... 形式へ変換
+if command -v cygpath >/dev/null 2>&1; then
+    DB_PATH_WIN="$(cygpath -m "$DB_PATH")"
+else
+    DB_PATH_WIN="$DB_PATH"
+fi
 
 # 未補完日付リストを SQL で取得し、中央値で前後半に分ける
 SPLIT_RESULT=$("$PYTHON" - <<PYEOF
 import sqlite3
 from datetime import datetime
 
-conn = sqlite3.connect(r"$DB_PATH")
+conn = sqlite3.connect(r"$DB_PATH_WIN")
 cur = conn.cursor()
 cur.execute("""
     SELECT DISTINCT r.race_date
