@@ -227,9 +227,9 @@ class ChariLotoScraper:
 
         try:
             dfs = pd.read_html(html)
-        except ValueError:
-            # テーブルが見つからない
-            logger.debug("テーブルなし: %s", url)
+        except (ValueError, ImportError, Exception) as e:
+            # テーブルなし / パーサ不在 / その他パースエラー
+            logger.debug("read_html失敗 %s: %s", url, e)
             return []
 
         if not dfs:
@@ -424,8 +424,8 @@ class ChariLotoScraper:
 
         try:
             dfs = pd.read_html(html)
-        except ValueError:
-            logger.debug("テーブルなし: %s", url)
+        except (ValueError, ImportError, Exception) as e:
+            logger.debug("read_html失敗 %s: %s", url, e)
             return []
 
         if not dfs:
@@ -587,41 +587,47 @@ class ChariLotoScraper:
         day_entries = []
 
         for jyo_cd in self.jyo_cds:
-            # 結果ページを取得
-            race_data_list = self.scrape_race_result(jyo_cd, date_str)
-            if not race_data_list:
-                continue
-
-            logger.info("[%s] 会場 %s: %d レース検出",
-                        date_str, jyo_cd, len(race_data_list))
-
-            for race_data in race_data_list:
-                race_id = race_data["race_id"]
-
-                # 取得済みスキップ
-                if race_id in scraped_ids:
-                    logger.debug("[SKIP] %s は取得済み", race_id)
+            try:
+                # 結果ページを取得
+                race_data_list = self.scrape_race_result(jyo_cd, date_str)
+                if not race_data_list:
                     continue
 
-                # races テーブル用
-                day_races.append({
-                    "race_id": race_id,
-                    "jyo_cd": race_data["jyo_cd"],
-                    "race_date": date_str,
-                    "race_no": race_data["race_no"],
-                })
+                logger.info("[%s] 会場 %s: %d レース検出",
+                            date_str, jyo_cd, len(race_data_list))
 
-                # results テーブル用
-                day_results.extend(race_data["results"])
+                for race_data in race_data_list:
+                    race_id = race_data["race_id"]
 
-                # 出走表を取得
+                    # 取得済みスキップ
+                    if race_id in scraped_ids:
+                        logger.debug("[SKIP] %s は取得済み", race_id)
+                        continue
+
+                    # races テーブル用
+                    day_races.append({
+                        "race_id": race_id,
+                        "jyo_cd": race_data["jyo_cd"],
+                        "race_date": date_str,
+                        "race_no": race_data["race_no"],
+                    })
+
+                    # results テーブル用
+                    day_results.extend(race_data["results"])
+
+                    # 出走表を取得
+                    self._polite_sleep()
+                    entry_list = self.scrape_race_entry(
+                        jyo_cd, date_str, race_data["race_no"]
+                    )
+                    day_entries.extend(entry_list)
+
                 self._polite_sleep()
-                entry_list = self.scrape_race_entry(
-                    jyo_cd, date_str, race_data["race_no"]
-                )
-                day_entries.extend(entry_list)
-
-            self._polite_sleep()
+            except Exception as e:
+                # 1会場でエラーが出ても他の会場は続行する
+                logger.error("[%s] 会場 %s スキップ: %s", date_str, jyo_cd, e)
+                self._log_failed(f"{jyo_cd}_{date_str}", str(e))
+                continue
 
         # DB保存
         if day_races:
