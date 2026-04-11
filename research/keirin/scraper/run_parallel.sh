@@ -1,16 +1,21 @@
 #!/bin/bash
 # ===========================================
 # run_parallel.sh
-# 競輪データの4並列収集
+# 競輪データの2フェーズ収集パイプライン
 #
 # 使い方:
 #   bash run_parallel.sh 2022-01-01 2024-12-31
 #
 # 設計:
-#   - 会場を4グループに分割して並列実行
-#   - 各プロセスは独自の進捗ファイル（.scrape_progress_XX_XX）を持つ
-#   - SQLite WAL モードで書き込み競合を回避
-#   - --resume で途中再開可能
+#   PHASE 1: chariloto.com から4並列でレース結果・出走表を収集
+#     - 会場を4グループに分割して並列実行
+#     - 各プロセスは独自の進捗ファイル（.scrape_progress_XX_XX）を持つ
+#     - SQLite WAL モードで書き込み競合を回避
+#     - --resume で途中再開可能
+#   PHASE 2: keirin.kdreams.jp から選手統計を補完
+#     - DB内の kyoso_tokuten IS NULL のレコードを一括補完
+#     - 単一プロセスで順次処理（並列不要）
+#   最後に --status で取得件数を表示
 # ===========================================
 
 set -u
@@ -33,7 +38,7 @@ if [ ! -f "$SCRAPER" ]; then
     exit 1
 fi
 
-echo "=== 4並列スクレイピング開始 ==="
+echo "=== PHASE1: chariloto 4並列収集開始 ==="
 echo "期間: $START 〜 $END"
 echo ""
 
@@ -82,4 +87,15 @@ echo "完了待機中..."
 wait $PID1 $PID2 $PID3 $PID4
 
 echo ""
-echo "=== 全プロセス完了 ==="
+echo "=== PHASE1完了 ==="
+echo ""
+echo "=== PHASE2: Kドリームズ補完開始 ==="
+python "$SCRAPER" --supplement_all
+PHASE2_STATUS=$?
+if [ $PHASE2_STATUS -ne 0 ]; then
+    echo "[警告] PHASE2 が非0で終了: exit=$PHASE2_STATUS"
+fi
+echo "=== PHASE2完了 ==="
+echo ""
+echo "=== 全処理完了 ==="
+python "$SCRAPER" --status
