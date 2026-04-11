@@ -38,20 +38,37 @@ if [ ! -f "$SCRAPER" ]; then
     exit 1
 fi
 
+# Python実行体の決定
+# 優先順位: $KEIRIN_PYTHON → python → python3 → 代表的なWindowsインストール先
+if [ -n "${KEIRIN_PYTHON:-}" ] && [ -x "$KEIRIN_PYTHON" ]; then
+    PYTHON="$KEIRIN_PYTHON"
+elif python -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
+    PYTHON="python"
+elif python3 -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
+    PYTHON="python3"
+elif [ -x "/c/Users/yuuga/python311/python.exe" ]; then
+    PYTHON="/c/Users/yuuga/python311/python.exe"
+else
+    echo "エラー: Python が見つかりません。環境変数 KEIRIN_PYTHON にパスを設定してください。"
+    echo "例: export KEIRIN_PYTHON=/c/Users/yuuga/python311/python.exe"
+    exit 1
+fi
+echo "Python: $PYTHON"
+
 echo "=== PHASE1: chariloto 4並列収集開始 ==="
 echo "期間: $START 〜 $END"
 echo ""
 
 # グループ1: 北日本（函館01・青森02・いわき平03・弥彦04）
 echo "[Group 1] 北日本 (1-4) 起動"
-python "$SCRAPER" \
+"$PYTHON" "$SCRAPER" \
     --start "$START" --end "$END" \
     --jyo_cds 1,2,3,4 --resume &
 PID1=$!
 
 # グループ2: 関東（前橋05・取手06・宇都宮07・大宮08・西武園09・京王閣10・立川11）
 echo "[Group 2] 関東 (5-11) 起動"
-python "$SCRAPER" \
+"$PYTHON" "$SCRAPER" \
     --start "$START" --end "$END" \
     --jyo_cds 5,6,7,8,9,10,11 --resume &
 PID2=$!
@@ -60,7 +77,7 @@ PID2=$!
 # （松戸12・千葉13・川崎14・平塚15・小田原16・伊東17・静岡18・
 #   豊橋19・名古屋20・岐阜21・大垣22・松阪23）
 echo "[Group 3] 南関東〜中部 (12-23) 起動"
-python "$SCRAPER" \
+"$PYTHON" "$SCRAPER" \
     --start "$START" --end "$END" \
     --jyo_cds 12,13,14,15,16,17,18,19,20,21,22,23 --resume &
 PID3=$!
@@ -70,7 +87,7 @@ PID3=$!
 # 玉野31・広島32・防府33・高松34・小松島35・高知36・松山37・
 # 小倉38・久留米39・武雄40・佐世保41・別府42・熊本43
 echo "[Group 4] 近畿以西 (24-43) 起動"
-python "$SCRAPER" \
+"$PYTHON" "$SCRAPER" \
     --start "$START" --end "$END" \
     --jyo_cds 24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 --resume &
 PID4=$!
@@ -90,7 +107,7 @@ echo ""
 echo "=== PHASE1完了 ==="
 echo ""
 echo "=== PHASE2: Kドリームズ補完開始 ==="
-python "$SCRAPER" --supplement_all
+"$PYTHON" "$SCRAPER" --supplement_all
 PHASE2_STATUS=$?
 if [ $PHASE2_STATUS -ne 0 ]; then
     echo "[警告] PHASE2 が非0で終了: exit=$PHASE2_STATUS"
@@ -98,4 +115,4 @@ fi
 echo "=== PHASE2完了 ==="
 echo ""
 echo "=== 全処理完了 ==="
-python "$SCRAPER" --status
+"$PYTHON" "$SCRAPER" --status
