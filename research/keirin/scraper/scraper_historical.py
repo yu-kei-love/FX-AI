@@ -1369,15 +1369,51 @@ class KdreamsSupplementScraper:
         DB の entries テーブル全体を走査して
         kyoso_tokuten が None のレコードを日付別に補完する。
         """
+        self._supplement_missing_dates_between(None, None)
+
+    def supplement_missing_range(self, start_date, end_date):
+        """
+        指定期間の未補完日付だけを処理する（並列実行用）。
+
+        Parameters:
+            start_date: "YYYY-MM-DD" 形式
+            end_date:   "YYYY-MM-DD" 形式
+        """
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        self._supplement_missing_dates_between(
+            start_dt.strftime("%Y%m%d"),
+            end_dt.strftime("%Y%m%d"),
+        )
+
+    def _supplement_missing_dates_between(self, start_compact, end_compact):
+        """
+        未補完日付リストを取得して順次補完する内部実装。
+
+        Parameters:
+            start_compact: "YYYYMMDD" 形式 or None
+            end_compact:   "YYYYMMDD" 形式 or None
+            （None の場合は全期間）
+        """
         conn = self._connect_db()
         cur = conn.cursor()
-        cur.execute("""
+
+        sql = """
             SELECT DISTINCT r.race_date
             FROM entries e
             JOIN races r ON e.race_id = r.race_id
             WHERE e.kyoso_tokuten IS NULL
-            ORDER BY r.race_date
-        """)
+        """
+        params = []
+        if start_compact is not None:
+            sql += " AND r.race_date >= ?"
+            params.append(start_compact)
+        if end_compact is not None:
+            sql += " AND r.race_date <= ?"
+            params.append(end_compact)
+        sql += " ORDER BY r.race_date"
+
+        cur.execute(sql, params)
         dates = [row[0] for row in cur.fetchall()]
         conn.close()
 
@@ -1385,9 +1421,12 @@ class KdreamsSupplementScraper:
             logger.info("補完対象の日付なし")
             return
 
-        logger.info("補完対象日数: %d", len(dates))
+        range_label = ""
+        if start_compact or end_compact:
+            range_label = f" (range {start_compact or '-'}〜{end_compact or '-'})"
+        logger.info("補完対象日数: %d%s", len(dates), range_label)
+
         for i, date_compact in enumerate(dates, 1):
-            # YYYYMMDD → YYYY-MM-DD
             try:
                 dt = datetime.strptime(date_compact, "%Y%m%d")
             except ValueError:
@@ -1426,6 +1465,9 @@ def main():
                         help="Kドリームズ補完を指定日(YYYY-MM-DD)で実行")
     parser.add_argument("--supplement_all", action="store_true",
                         help="Kドリームズ補完をDB全体の未補完分に実行")
+    parser.add_argument("--supplement_range", type=str, default=None,
+                        help="Kドリームズ補完を指定期間の未補完分に実行"
+                             "（例: 2022-04-20,2023-08-26）")
 
     args = parser.parse_args()
 
@@ -1441,7 +1483,7 @@ def main():
             return
 
     # Kドリームズ補完モード
-    if args.supplement or args.supplement_all:
+    if args.supplement or args.supplement_all or args.supplement_range:
         try:
             supp = KdreamsSupplementScraper(
                 db_path=args.db,
@@ -1452,6 +1494,16 @@ def main():
             return
         if args.supplement_all:
             supp.supplement_missing_all()
+        elif args.supplement_range:
+            parts = args.supplement_range.split(",")
+            if len(parts) != 2:
+                logger.error("--supplement_range は 'START,END' 形式で指定")
+                return
+            try:
+                supp.supplement_missing_range(parts[0].strip(), parts[1].strip())
+            except ValueError as e:
+                logger.error("--supplement_range 日付パース失敗: %s", e)
+                return
         else:
             supp.supplement_entries_for_date(args.supplement)
         return
