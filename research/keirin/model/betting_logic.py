@@ -7,11 +7,20 @@
 #   - ライン信頼度のペナルティ
 #   - 裏切りリスクフィルター
 #
+# v0.10 修正：
+#   - オッズ急変フィルターを scraper_realtime.py の
+#     odds_history テーブルと接続
+#   - スナップショットキーを 60min/30min/10min/0min に統一
+#   - 判定は 0min vs 10min で行う
+#   - load_odds_history_from_db / load_trifecta_odds_from_db を新設
+#
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
 # ===========================================
 
+import sqlite3
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -35,6 +44,10 @@ PREDICTABILITY_MIN = 60  # これ以下は見送り推奨
 
 # EV閾値
 EV_MIN = 1.10  # EV ≥ 1.1 のみ購入候補
+
+# scraper_realtime.py の DEFAULT_SNAPSHOT_MINUTES = [60, 30, 10, 0]
+# と合わせる
+ODDS_SNAPSHOT_KEYS = ["60min", "30min", "10min", "0min"]
 
 
 @dataclass
@@ -122,32 +135,221 @@ def calc_predictability_score(
     return max(0, min(100, score))
 
 
+# =============================================================
+# DB アダプター関数（v0.10 新設）
+# =============================================================
+
+def load_odds_history_from_db(
+    db_path,
+    race_id: str,
+    car_no: int,
+    odds_type: str = "1t",
+) -> dict:
+    """
+    odds_history テーブルから指定レース・車番の
+    オッズ履歴を取得して betting_logic が期待する形式に変換する。
+
+    各スナップショットで、指定車番が1着となる組合せ（sha_ban_1 = car_no）
+    のうち最小オッズ（最人気）を代表値として返す。
+    これにより車番ごとの人気度を時系列で追える。
+
+    注意：
+    scraper_realtime.py は odds_type="2t"（2車単）と "3t"（3連単）を
+    保存しており、"1t"（単勝）は保存していない。
+    実用時は odds_type="2t" または "3t" を渡すこと。
+    （デフォルトの "1t" は仕様書に従った値）
+
+    Parameters:
+        db_path   : SQLiteのパス
+        race_id   : レースID（例 "01_20260411_01"）
+        car_no    : 車番（sha_ban_1 として検索）
+        odds_type : "1t"/"2t"/"3t"（デフォルト: "1t"）
+
+    Returns:
+        {
+          "60min": float or None,
+          "30min": float or None,
+          "10min": float or None,
+          "0min":  float or None,
+        }
+        レコードが存在しないスナップショットは None。
+    """
+    result = {k: None for k in ODDS_SNAPSHOT_KEYS}
+
+    if db_path is None:
+        return result
+
+    db = Path(db_path) if not isinstance(db_path, Path) else db_path
+    if not db.exists():
+        return result
+
+    try:
+        conn = sqlite3.connect(str(db))
+        cur = conn.cursor()
+
+        # odds_history テーブル存在確認
+        cur.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='odds_history'"
+        )
+        if cur.fetchone() is None:
+            conn.close()
+            return result
+
+        # 各スナップショット（60/30/10/0分前）での最小オッズを取得
+        # sha_ban_1 = car_no として「その選手が1着」となる組合せを検索
+        key_to_minutes = {
+            "60min": 60,
+            "30min": 30,
+            "10min": 10,
+            "0min":  0,
+        }
+
+        for key, minutes in key_to_minutes.items():
+            cur.execute("""
+                SELECT MIN(odds)
+                FROM odds_history
+                WHERE race_id = ?
+                  AND odds_type = ?
+                  AND minutes_before = ?
+                  AND sha_ban_1 = ?
+                  AND odds > 0
+            """, (race_id, odds_type, minutes, int(car_no)))
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                result[key] = float(row[0])
+
+        conn.close()
+    except (sqlite3.Error, Exception):
+        pass
+
+    return result
+
+
+def load_trifecta_odds_from_db(
+    db_path,
+    race_id: str,
+) -> dict:
+    """
+    odds_history テーブルから race_id の3連単オッズを取得する。
+
+    odds_type="3t" の最新スナップショット（minutes_before が最小）を使う。
+    minutes_before=0 が存在すればそれを優先、なければ次に近い値を使う。
+
+    Parameters:
+        db_path : SQLiteのパス
+        race_id : レースID
+
+    Returns:
+        {(sha_ban_1, sha_ban_2, sha_ban_3): odds, ...}
+        → generate_betting_signals() の odds_dict に直接渡せる形式。
+        データが存在しない場合は空 dict。
+    """
+    result = {}
+
+    if db_path is None:
+        return result
+
+    db = Path(db_path) if not isinstance(db_path, Path) else db_path
+    if not db.exists():
+        return result
+
+    try:
+        conn = sqlite3.connect(str(db))
+        cur = conn.cursor()
+
+        # odds_history テーブル存在確認
+        cur.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='odds_history'"
+        )
+        if cur.fetchone() is None:
+            conn.close()
+            return result
+
+        # race_id の3連単で利用可能な minutes_before を取得
+        cur.execute("""
+            SELECT DISTINCT minutes_before
+            FROM odds_history
+            WHERE race_id = ? AND odds_type = '3t'
+            ORDER BY minutes_before
+        """, (race_id,))
+        available_mins = [r[0] for r in cur.fetchall()]
+
+        if not available_mins:
+            conn.close()
+            return result
+
+        # 最小 minutes_before（最新スナップショット）を選択
+        latest_min = available_mins[0]
+
+        # そのスナップショットの全オッズを取得
+        cur.execute("""
+            SELECT sha_ban_1, sha_ban_2, sha_ban_3, odds
+            FROM odds_history
+            WHERE race_id = ?
+              AND odds_type = '3t'
+              AND minutes_before = ?
+              AND odds > 0
+        """, (race_id, latest_min))
+
+        for row in cur.fetchall():
+            s1, s2, s3, odds = row
+            if s1 is None or s2 is None or s3 is None:
+                continue
+            result[(int(s1), int(s2), int(s3))] = float(odds)
+
+        conn.close()
+    except (sqlite3.Error, Exception):
+        pass
+
+    return result
+
+
+# =============================================================
+# フィルター関数
+# =============================================================
+
 def apply_odds_surge_filter(
     signal: BettingSignal,
     odds_history: dict,
 ) -> BettingSignal:
     """
-    オッズ急変フィルター（ボートレースと同じ設計）。
+    オッズ急変フィルター。
 
-    15分前オッズ → 1分前オッズの変化を監視：
+    v0.10 修正：
+    キーを 60min/30min/10min/0min に統一し、
+    判定は「0min vs 10min」で行うように変更した。
+    （scraper_realtime.py の DEFAULT_SNAPSHOT_MINUTES と整合）
+
+    締切直前10分前 → 締切時点の変化を監視：
     - ≥20%上昇 → 買いシグナル完全取り消し（filters_passed=False）
     - 10〜20%上昇 → 信頼度を50%カット
     - 5〜10%上昇  → 信頼度を20%カット
 
     Parameters:
-        signal      : BettingSignal
-        odds_history: {"15min": float, "1min": float} の dict
+        signal       : BettingSignal
+        odds_history : {
+            "60min": float or None,
+            "30min": float or None,
+            "10min": float or None,
+            "0min":  float or None,
+        }
+        （load_odds_history_from_db() の戻り値と同形式）
 
     Returns:
         修正済みの BettingSignal
     """
-    odds_15min = odds_history.get("15min")
-    odds_1min  = odds_history.get("1min")
+    if not odds_history:
+        return signal
 
-    if odds_15min is None or odds_1min is None or odds_15min <= 0:
+    odds_10min = odds_history.get("10min")
+    odds_0min  = odds_history.get("0min")
+
+    if odds_10min is None or odds_0min is None or odds_10min <= 0:
         return signal  # データなしはスルー
 
-    change_rate = (odds_1min - odds_15min) / odds_15min
+    change_rate = (odds_0min - odds_10min) / odds_10min
 
     if change_rate >= 0.20:
         signal.filters_passed = False
@@ -282,12 +484,15 @@ def generate_betting_signals(
     Parameters:
         trifecta_probs  : {(1st,2nd,3rd): 確率}
         odds_dict       : {(1st,2nd,3rd): オッズ}
+                          load_trifecta_odds_from_db() の戻り値をそのまま渡せる
         race_data       : レース情報（grade等）
         line_probs      : ライン予測確率
         capital         : 現在の資金
         drawdown_ratio  : ドローダウン率
         betrayal_risks  : {car_no: 裏切り率} （省略可）
-        odds_history    : {car_no: {"15min": float, "1min": float}} （省略可）
+        odds_history    : {car_no: {"60min","30min","10min","0min"}} 形式
+                          load_odds_history_from_db() の戻り値を car_no 別に集めた dict
+                          （省略可）
 
     Returns:
         BettingSignalのリスト（EV≥1.1のもの）
@@ -376,7 +581,7 @@ def _calc_line_confidence_for_combo(
 
 def format_betting_signal(signal: BettingSignal) -> str:
     """買いシグナルを整形して文字列として返す"""
-    status = "✓ 買い" if signal.filters_passed else "× スキップ"
+    status = "買い" if signal.filters_passed else "スキップ"
     combo_str = "-".join(str(c) for c in signal.combo)
     return (
         f"[{status}] {combo_str} | "
