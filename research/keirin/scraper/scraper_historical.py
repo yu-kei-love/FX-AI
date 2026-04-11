@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "keirin" / "keirin.db"
 FAILED_LOG = Path(__file__).resolve().parent / "failed_races.log"
-PROGRESS_FILE = Path(__file__).resolve().parent / ".scrape_progress"
+PROGRESS_DIR = Path(__file__).resolve().parent
 
 BASE_URL = "https://www.chariloto.com"
 
@@ -43,14 +43,23 @@ JYO_CODES = [f"{i:02d}" for i in range(1, 44)]
 class ChariLotoScraper:
     """chariloto.com から競輪の過去レース結果・出走表を取得する"""
 
-    def __init__(self, db_path=None, delay=2.0):
+    def __init__(self, db_path=None, delay=2.0, jyo_cds=None):
         """
         Parameters:
             db_path: SQLiteファイルのパス（デフォルト: data/keirin/keirin.db）
             delay: リクエスト間の待機秒数（サーバー負荷配慮）
+            jyo_cds: 対象会場コードのリスト（int または "01"〜"43" 形式）
+                     None の場合は全43会場を対象
         """
         self.db_path = Path(db_path) if db_path else DB_PATH
         self.delay = delay
+        # 会場コードを "01"〜"43" 形式に正規化
+        if jyo_cds is None:
+            self.jyo_cds = list(JYO_CODES)
+        else:
+            self.jyo_cds = [f"{int(c):02d}" for c in jyo_cds]
+        # 並列実行時の進捗ファイル（対象会場グループ別）
+        self.progress_file = self._make_progress_file()
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "KeirinDataCollector/1.0 (personal research use)",
@@ -58,10 +67,35 @@ class ChariLotoScraper:
         })
         self._init_db()
 
+    def _make_progress_file(self) -> Path:
+        """
+        対象会場グループごとに進捗ファイルを分離する。
+        並列実行時に互いの進捗を上書きしないため。
+        """
+        if len(self.jyo_cds) == len(JYO_CODES):
+            return PROGRESS_DIR / ".scrape_progress"
+        # 先頭と末尾のコードでサフィックスを作る
+        suffix = f"{self.jyo_cds[0]}_{self.jyo_cds[-1]}"
+        return PROGRESS_DIR / f".scrape_progress_{suffix}"
+
+    def _connect_db(self) -> sqlite3.Connection:
+        """
+        DBに接続し WAL モードを有効化する。
+
+        WAL モード:
+          複数プロセスから同時書き込みしても競合しない。
+          synchronous=NORMAL でディスクI/Oを軽減。
+        """
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        return conn
+
     def _init_db(self):
-        """DBスキーマを初期化する"""
+        """DBスキーマを初期化する（WALモード有効化も実施）"""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect_db()
         cur = conn.cursor()
         cur.executescript("""
             CREATE TABLE IF NOT EXISTS races (
@@ -152,7 +186,7 @@ class ChariLotoScraper:
 
     def _get_scraped_race_ids(self):
         """取得済みのrace_idセットを返す"""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect_db()
         cur = conn.cursor()
         cur.execute("SELECT race_id FROM races")
         ids = {row[0] for row in cur.fetchall()}
@@ -161,7 +195,7 @@ class ChariLotoScraper:
 
     def _get_scraped_dates(self):
         """取得済みの日付セットを返す"""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect_db()
         cur = conn.cursor()
         cur.execute("SELECT DISTINCT race_date FROM races")
         dates = {row[0] for row in cur.fetchall()}
@@ -464,7 +498,7 @@ class ChariLotoScraper:
             entries: list[dict] - entriesテーブル用データ
         """
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect_db()
         cur = conn.cursor()
 
         for race in races:
@@ -552,7 +586,7 @@ class ChariLotoScraper:
         day_results = []
         day_entries = []
 
-        for jyo_cd in JYO_CODES:
+        for jyo_cd in self.jyo_cds:
             # 結果ページを取得
             race_data_list = self.scrape_race_result(jyo_cd, date_str)
             if not race_data_list:
@@ -627,6 +661,10 @@ class ChariLotoScraper:
                      start_dt.strftime("%Y-%m-%d"),
                      end_dt.strftime("%Y-%m-%d"),
                      total_days)
+        logger.info("対象会場: %d場 (%s)",
+                    len(self.jyo_cds),
+                    ",".join(self.jyo_cds))
+        logger.info("進捗ファイル: %s", self.progress_file.name)
 
         while current <= end_dt:
             date_str = current.strftime("%Y%m%d")
@@ -659,16 +697,16 @@ class ChariLotoScraper:
         return None
 
     def _save_progress(self, last_date, end_date):
-        """進捗をファイルに保存する（--resume用）"""
-        with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
+        """進捗をファイルに保存する（--resume用・グループ別）"""
+        with open(self.progress_file, "w", encoding="utf-8") as f:
             f.write(f"{last_date}\n{end_date}\n")
 
     def _load_progress(self):
-        """保存された進捗を読み込む"""
-        if not PROGRESS_FILE.exists():
+        """保存された進捗を読み込む（グループ別）"""
+        if not self.progress_file.exists():
             return None, None
         try:
-            lines = PROGRESS_FILE.read_text(encoding="utf-8").strip().split("\n")
+            lines = self.progress_file.read_text(encoding="utf-8").strip().split("\n")
             if len(lines) >= 2:
                 return lines[0], lines[1]
         except Exception:
@@ -681,7 +719,7 @@ class ChariLotoScraper:
 
     def get_status(self):
         """取得済み件数・進捗を表示する"""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect_db()
         cur = conn.cursor()
 
         cur.execute("SELECT COUNT(*) FROM races")
@@ -750,9 +788,32 @@ def main():
                         help="リクエスト間隔（秒、デフォルト: 2.0）")
     parser.add_argument("--db", type=str, default=None,
                         help="DBファイルパス（デフォルト: data/keirin/keirin.db）")
+    parser.add_argument("--jyo_cds", type=str, default=None,
+                        help="対象会場コード（カンマ区切り、例: 1,2,3,4）。"
+                             "省略時は全43会場を対象")
 
     args = parser.parse_args()
-    scraper = ChariLotoScraper(db_path=args.db, delay=args.delay)
+
+    # --jyo_cds のパース
+    jyo_cds = None
+    if args.jyo_cds:
+        try:
+            jyo_cds = [int(c.strip()) for c in args.jyo_cds.split(",")
+                       if c.strip()]
+            if not jyo_cds:
+                raise ValueError("会場コードが空")
+            for c in jyo_cds:
+                if c < 1 or c > 43:
+                    raise ValueError(f"会場コードは1〜43: {c}")
+        except ValueError as e:
+            logger.error("--jyo_cds の形式が不正です: %s", e)
+            return
+
+    scraper = ChariLotoScraper(
+        db_path=args.db,
+        delay=args.delay,
+        jyo_cds=jyo_cds,
+    )
 
     if args.status:
         scraper.get_status()
@@ -761,7 +822,13 @@ def main():
     if args.resume:
         last_date, end_date = scraper._load_progress()
         if last_date is None or end_date is None:
-            logger.error("再開用の進捗ファイルが見つかりません: %s", PROGRESS_FILE)
+            # --start/--end が指定されていればそちらを優先して続行
+            if args.start and args.end:
+                logger.info("進捗ファイルなし。--start/--end で新規実行します")
+                scraper.scrape_range(args.start, args.end)
+                return
+            logger.error("再開用の進捗ファイルが見つかりません: %s",
+                         scraper.progress_file)
             return
         # 前回の翌日から再開
         resume_dt = datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)
