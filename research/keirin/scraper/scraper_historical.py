@@ -48,9 +48,11 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "keirin" / "keirin.db"
 FAILED_LOG = Path(__file__).resolve().parent / "failed_races.log"
+FAILED_KDREAMS_LOG = Path(__file__).resolve().parent / "failed_kdreams.log"
 PROGRESS_DIR = Path(__file__).resolve().parent
 
 BASE_URL = "https://www.chariloto.com"
+KDREAMS_BASE_URL = "https://keirin.kdreams.jp"
 
 # bank_master から JKA会場コード一覧を生成
 # 例: ["11", "12", "13", "21", "22", ...]
@@ -158,6 +160,7 @@ class ChariLotoScraper:
                 gear_ratio    REAL,
                 back_count    INTEGER,
                 home_count    INTEGER,
+                start_count   INTEGER,
                 kyakushitsu   TEXT,
                 created_at    TEXT NOT NULL,
                 PRIMARY KEY (race_id, sha_ban),
@@ -168,6 +171,17 @@ class ChariLotoScraper:
             CREATE INDEX IF NOT EXISTS idx_results_race ON results(race_id);
             CREATE INDEX IF NOT EXISTS idx_entries_race ON entries(race_id);
         """)
+
+        # 既存DBにstart_countがなければ追加（マイグレーション）
+        cur.execute("PRAGMA table_info(entries)")
+        existing_cols = {row[1] for row in cur.fetchall()}
+        if "start_count" not in existing_cols:
+            try:
+                cur.execute("ALTER TABLE entries ADD COLUMN start_count INTEGER")
+                logger.info("entries テーブルに start_count カラムを追加")
+            except sqlite3.OperationalError as e:
+                logger.warning("start_count 追加失敗: %s", e)
+
         conn.commit()
         conn.close()
         logger.info("DB初期化完了: %s", self.db_path)
@@ -824,6 +838,570 @@ class ChariLotoScraper:
 
 
 # =========================================================
+# Kドリームズ補完スクレイパー
+# =========================================================
+
+class KdreamsSupplementScraper:
+    """
+    keirin.kdreams.jp から選手統計を取得して
+    chariloto の entries テーブルの None 項目を補完する。
+
+    取得項目:
+      - kyoso_tokuten（競走得点）
+      - gear_ratio（ギア倍数）
+      - back_count（B: バック回数）
+      - start_count（S: スタート回数）
+      - kyakushitsu（脚質: 逃/捲/差/追/自）
+
+    注意:
+      - home_count（H: ホーム回数）は kdreams 側のページに存在しないため
+        補完対象外（None のまま）
+      - robots.txt は 200 だが text/html を返す（= robots.txt 非設置）
+        → Disallow なしと解釈してスクレイピング可
+    """
+
+    def __init__(self, db_path=None, delay=2.0):
+        """
+        Parameters:
+            db_path: SQLiteファイルのパス
+            delay: リクエスト間の待機秒数
+        """
+        self.db_path = Path(db_path) if db_path else DB_PATH
+        self.delay = delay
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (KeirinDataCollector/1.0; "
+                          "personal research use)",
+            "Accept-Language": "ja,en;q=0.9",
+        })
+
+        if not self.db_path.exists():
+            raise FileNotFoundError(
+                f"DB が見つかりません: {self.db_path}\n"
+                "先に ChariLotoScraper でデータを取得してください"
+            )
+
+        # jyo_cd(bank_master venue_id int) → jka_code マップ
+        self.venue_id_to_jka = {}
+        for info in BANK_MASTER.values():
+            vid = info.get("venue_id")
+            jka = info.get("jka_code")
+            if vid and jka:
+                self.venue_id_to_jka[int(vid)] = jka
+
+        # start_count カラムが存在しなければ追加（マイグレーション）
+        self._ensure_start_count_column()
+
+    def _ensure_start_count_column(self):
+        """entriesテーブルに start_count カラムがなければ追加する"""
+        conn = self._connect_db()
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(entries)")
+        cols = {row[1] for row in cur.fetchall()}
+        if "start_count" not in cols:
+            try:
+                cur.execute(
+                    "ALTER TABLE entries ADD COLUMN start_count INTEGER"
+                )
+                conn.commit()
+                logger.info("entries テーブルに start_count カラムを追加")
+            except sqlite3.OperationalError as e:
+                logger.warning("start_count 追加失敗: %s", e)
+        conn.close()
+
+    def _connect_db(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        return conn
+
+    def _polite_sleep(self):
+        time.sleep(self.delay)
+
+    def _fetch_html(self, url, max_retries=3):
+        """URL からHTMLを取得。リトライ付き。"""
+        for attempt in range(1, max_retries + 1):
+            try:
+                resp = self.session.get(url, timeout=30)
+                if resp.status_code == 404:
+                    logger.debug("404 Not Found: %s", url)
+                    return None
+                if resp.status_code == 503:
+                    logger.warning("503 SRV Unavailable: %s (%d/%d)",
+                                   url, attempt, max_retries)
+                    time.sleep(2 ** attempt)
+                    continue
+                resp.raise_for_status()
+                resp.encoding = "utf-8"
+                return resp.text
+            except requests.RequestException as e:
+                logger.warning("リクエストエラー: %s (%d/%d): %s",
+                               url, attempt, max_retries, e)
+                if attempt < max_retries:
+                    time.sleep(2 ** attempt)
+        return None
+
+    def _log_failed(self, identifier, reason):
+        """失敗情報を failed_kdreams.log に記録"""
+        with open(FAILED_KDREAMS_LOG, "a", encoding="utf-8") as f:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"{ts}\t{identifier}\t{reason}\n")
+
+    # =========================================================
+    # URL発見
+    # =========================================================
+
+    def _fetch_racecard_urls(self, date_str):
+        """
+        /racecard/{YYYY}/{MM}/{DD}/ から
+        その日の全レース詳細 URL を取得する。
+
+        Parameters:
+            date_str: "YYYY-MM-DD" 形式
+
+        Returns:
+            list[dict]: [
+                {
+                  "venue_romaji": str,   # "matsusaka"
+                  "jka_code":     str,   # "47"
+                  "race_no":      int,
+                  "url":          str,
+                  "race_id_kd":   str,   # kdreams内部の16桁ID
+                },
+                ...
+            ]
+        """
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            logger.error("日付パース失敗: %s", date_str)
+            return []
+
+        url = f"{KDREAMS_BASE_URL}/racecard/{dt:%Y}/{dt:%m}/{dt:%d}/"
+        html = self._fetch_html(url)
+        if html is None:
+            return []
+
+        # /{venue_romaji}/racedetail/{16桁race_id} を抽出
+        pattern = re.compile(r"/([a-z_]+)/racedetail/(\d{16})")
+        matches = sorted(set(pattern.findall(html)))
+
+        results = []
+        for venue_romaji, race_id_kd in matches:
+            if venue_romaji in ("racecard", "sp", "pc", "css", "js",
+                                "images", "img"):
+                continue
+            # race_id_kd = JKA(2) + 初日YYYYMMDD(8) + 日数(2) + race_no(4)
+            jka = race_id_kd[:2]
+            try:
+                race_no = int(race_id_kd[-4:])
+            except ValueError:
+                continue
+            results.append({
+                "venue_romaji": venue_romaji,
+                "jka_code": jka,
+                "race_no": race_no,
+                "url": f"{KDREAMS_BASE_URL}/{venue_romaji}"
+                       f"/racedetail/{race_id_kd}",
+                "race_id_kd": race_id_kd,
+            })
+
+        return results
+
+    # =========================================================
+    # レース詳細ページのパース
+    # =========================================================
+
+    def _parse_racedetail(self, url):
+        """
+        レース詳細ページから選手統計を取得する。
+
+        Parameters:
+            url: kdreams の racedetail URL
+
+        Returns:
+            dict: {sha_ban: {
+                "senshu_name": str,
+                "kyoso_tokuten": float or None,
+                "gear_ratio": float or None,
+                "back_count": int or None,
+                "start_count": int or None,
+                "kyakushitsu": str or None,
+            }}
+            取得失敗時は空dict。
+        """
+        html = self._fetch_html(url)
+        if html is None:
+            return {}
+
+        try:
+            dfs = pd.read_html(io.StringIO(html))
+        except Exception as e:
+            logger.debug("read_html 失敗 %s: %s", url, e)
+            return {}
+
+        if not dfs:
+            return {}
+
+        # table[0] を使う（最も情報量が多い）
+        # 必要なら他テーブルもfallbackとして走査する
+        for df in dfs[:3]:
+            parsed = self._extract_player_stats(df)
+            if parsed:
+                return parsed
+
+        return {}
+
+    def _extract_player_stats(self, df):
+        """
+        DataFrame（MultiIndex列）から選手統計を抽出する。
+
+        Returns:
+            dict: {sha_ban: {...}}
+        """
+        if df.empty:
+            return {}
+
+        # MultiIndex 列を flatten（最下層のラベルを使う）
+        if isinstance(df.columns, pd.MultiIndex):
+            flat_cols = []
+            for c in df.columns:
+                last = c[-1]
+                flat_cols.append(self._normalize_col_name(str(last)))
+            df = df.copy()
+            df.columns = flat_cols
+        else:
+            df = df.copy()
+            df.columns = [self._normalize_col_name(str(c))
+                          for c in df.columns]
+
+        cols = list(df.columns)
+
+        sha_ban_col = self._find_col(cols, ["車番"])
+        name_col = self._find_col(cols, ["選手名"])
+        kyakushitsu_col = self._find_col(cols, ["脚質"])
+        gear_col = self._find_col(cols, ["ギヤ倍数", "ギア倍数", "ギヤ", "ギア"])
+        tokuten_col = self._find_col(cols, ["競走得点"])
+        s_col = self._find_col_exact(cols, ["S"])
+        b_col = self._find_col_exact(cols, ["B"])
+
+        if sha_ban_col is None or tokuten_col is None:
+            return {}
+
+        result = {}
+        for _, row in df.iterrows():
+            sha_ban = self._to_int(row.get(sha_ban_col))
+            if sha_ban is None or sha_ban < 1 or sha_ban > 9:
+                continue
+
+            # 選手名のパース: "山元 大夢  石　川/24/123"
+            senshu_name = None
+            if name_col:
+                raw = str(row.get(name_col, "")).strip()
+                if raw and raw != "nan":
+                    # "  " (2スペース) または "\u3000" で分割
+                    parts = re.split(r"\s{2,}|\u3000{2,}|  ", raw, maxsplit=1)
+                    senshu_name = parts[0].strip() if parts else None
+
+            result[sha_ban] = {
+                "senshu_name": senshu_name,
+                "kyoso_tokuten": self._to_float(row.get(tokuten_col)),
+                "gear_ratio": self._to_float(row.get(gear_col))
+                              if gear_col else None,
+                "back_count": self._to_int(row.get(b_col)) if b_col else None,
+                "start_count": self._to_int(row.get(s_col)) if s_col else None,
+                "kyakushitsu": self._clean_str(row.get(kyakushitsu_col))
+                               if kyakushitsu_col else None,
+            }
+
+        return result
+
+    def _normalize_col_name(self, name):
+        """列名を正規化（全空白除去）"""
+        return re.sub(r"\s+", "", name)
+
+    def _find_col(self, cols, candidates):
+        """候補の部分一致で列名を検索"""
+        for cand in candidates:
+            for c in cols:
+                if cand in c:
+                    return c
+        return None
+
+    def _find_col_exact(self, cols, candidates):
+        """候補の完全一致で列名を検索（S,B の誤マッチ防止）"""
+        for cand in candidates:
+            for c in cols:
+                if c == cand:
+                    return c
+        return None
+
+    def _to_int(self, val):
+        if val is None or pd.isna(val):
+            return None
+        try:
+            return int(float(str(val).strip()))
+        except (ValueError, TypeError):
+            return None
+
+    def _to_float(self, val):
+        if val is None or pd.isna(val):
+            return None
+        try:
+            s = str(val).strip().replace(",", "")
+            if s in ("", "nan", "-", "---"):
+                return None
+            return float(s)
+        except (ValueError, TypeError):
+            return None
+
+    def _clean_str(self, val):
+        if val is None or pd.isna(val):
+            return None
+        s = str(val).strip().replace("\u3000", "")
+        s = re.sub(r"\s+", "", s)
+        if s in ("", "nan", "None"):
+            return None
+        return s
+
+    # =========================================================
+    # マッチング用ヘルパ
+    # =========================================================
+
+    def _names_match(self, a, b):
+        """
+        選手名の簡易比較。
+        全角半角スペース・空白類を全て除去して比較する。
+        """
+        if not a or not b:
+            return False
+        na = re.sub(r"[\s\u3000]+", "", str(a))
+        nb = re.sub(r"[\s\u3000]+", "", str(b))
+        return na == nb
+
+    # =========================================================
+    # 日付指定で補完
+    # =========================================================
+
+    def supplement_entries_for_date(self, date_str):
+        """
+        指定日のentriesテーブルで kyoso_tokuten が None の選手を
+        Kドリームズから取得して補完する。
+
+        Parameters:
+            date_str: "YYYY-MM-DD" 形式
+        """
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            logger.error("日付パース失敗: %s", date_str)
+            return
+        date_compact = dt.strftime("%Y%m%d")
+
+        # DB から該当日の補完対象を取得
+        conn = self._connect_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT e.race_id, e.sha_ban, e.senshu_name, r.jyo_cd
+            FROM entries e
+            JOIN races r ON e.race_id = r.race_id
+            WHERE r.race_date = ? AND e.kyoso_tokuten IS NULL
+            ORDER BY e.race_id, e.sha_ban
+        """, (date_compact,))
+        missing = cur.fetchall()
+        conn.close()
+
+        if not missing:
+            logger.info("[%s] 補完対象なし", date_str)
+            return
+
+        # race_id 別にグルーピング
+        missing_by_race = {}
+        target_jkas = set()
+        for race_id, sha_ban, senshu_name, jyo_cd in missing:
+            jka = self.venue_id_to_jka.get(int(jyo_cd))
+            if jka is None:
+                logger.debug("jyo_cd=%s に対応する jka_code なし", jyo_cd)
+                continue
+            target_jkas.add(jka)
+            missing_by_race.setdefault(race_id, []).append({
+                "sha_ban": sha_ban,
+                "senshu_name": senshu_name,
+                "jka_code": jka,
+            })
+
+        logger.info("[%s] 補完対象: %d entries / %d races / %d venues",
+                    date_str, len(missing), len(missing_by_race),
+                    len(target_jkas))
+
+        # kdreams から該当日のレース詳細URLを取得
+        racecard_entries = self._fetch_racecard_urls(date_str)
+        self._polite_sleep()
+
+        if not racecard_entries:
+            logger.warning("[%s] racecard 取得失敗", date_str)
+            self._log_failed(f"racecard_{date_str}", "empty")
+            return
+
+        # (jka_code, race_no) → url マップ
+        url_map = {}
+        for e in racecard_entries:
+            if e["jka_code"] not in target_jkas:
+                continue
+            key = (e["jka_code"], e["race_no"])
+            url_map[key] = e["url"]
+
+        logger.info("[%s] マッチする kdreams URL: %d",
+                    date_str, len(url_map))
+
+        # 同じ URL を複数選手で使い回すためキャッシュ
+        url_cache = {}
+        updates = []
+        matched_races = 0
+        unmatched_races = 0
+
+        for race_id, misses in missing_by_race.items():
+            # chariloto race_id: "{venue_id}_{YYYYMMDD}_{RR}"
+            parts = race_id.split("_")
+            if len(parts) != 3:
+                continue
+            try:
+                race_no = int(parts[2])
+            except ValueError:
+                continue
+            jka = misses[0]["jka_code"]
+
+            url = url_map.get((jka, race_no))
+            if url is None:
+                unmatched_races += 1
+                continue
+
+            if url not in url_cache:
+                url_cache[url] = self._parse_racedetail(url)
+                self._polite_sleep()
+
+            player_stats = url_cache[url]
+            if not player_stats:
+                self._log_failed(f"parse_{race_id}", "parse empty")
+                continue
+
+            matched_races += 1
+            for miss in misses:
+                sha_ban = miss["sha_ban"]
+                target_name = miss["senshu_name"]
+
+                stat = player_stats.get(sha_ban)
+                if stat is None:
+                    continue
+
+                # 選手名で念のため確認（違っていてもログのみ、更新は実施）
+                if target_name and stat.get("senshu_name"):
+                    if not self._names_match(target_name, stat["senshu_name"]):
+                        logger.debug(
+                            "name mismatch %s: chariloto=%r kdreams=%r",
+                            race_id, target_name, stat["senshu_name"],
+                        )
+
+                updates.append({
+                    "race_id": race_id,
+                    "sha_ban": sha_ban,
+                    "kyoso_tokuten": stat.get("kyoso_tokuten"),
+                    "gear_ratio": stat.get("gear_ratio"),
+                    "back_count": stat.get("back_count"),
+                    "start_count": stat.get("start_count"),
+                    "kyakushitsu": stat.get("kyakushitsu"),
+                })
+
+        # 一括 UPDATE（kyoso_tokuten が NULL のもののみ更新）
+        if updates:
+            self._apply_updates(updates)
+
+        logger.info(
+            "[%s] 完了: %d updates / matched_races=%d unmatched_races=%d",
+            date_str, len(updates), matched_races, unmatched_races,
+        )
+
+    def _apply_updates(self, updates):
+        """
+        entries テーブルに一括更新をかける。
+        kyoso_tokuten が NULL のレコードのみ更新（上書き防止）。
+        """
+        conn = self._connect_db()
+        cur = conn.cursor()
+
+        for u in updates:
+            try:
+                cur.execute("""
+                    UPDATE entries
+                    SET kyoso_tokuten = COALESCE(?, kyoso_tokuten),
+                        gear_ratio    = COALESCE(?, gear_ratio),
+                        back_count    = COALESCE(?, back_count),
+                        start_count   = COALESCE(?, start_count),
+                        kyakushitsu   = COALESCE(?, kyakushitsu)
+                    WHERE race_id = ?
+                      AND sha_ban = ?
+                      AND kyoso_tokuten IS NULL
+                """, (
+                    u["kyoso_tokuten"],
+                    u["gear_ratio"],
+                    u["back_count"],
+                    u["start_count"],
+                    u["kyakushitsu"],
+                    u["race_id"],
+                    u["sha_ban"],
+                ))
+            except sqlite3.Error as e:
+                logger.warning(
+                    "UPDATE エラー race_id=%s sha_ban=%s: %s",
+                    u["race_id"], u["sha_ban"], e,
+                )
+
+        conn.commit()
+        conn.close()
+
+    # =========================================================
+    # DB全体の未補完を一括処理
+    # =========================================================
+
+    def supplement_missing_all(self):
+        """
+        DB の entries テーブル全体を走査して
+        kyoso_tokuten が None のレコードを日付別に補完する。
+        """
+        conn = self._connect_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT r.race_date
+            FROM entries e
+            JOIN races r ON e.race_id = r.race_id
+            WHERE e.kyoso_tokuten IS NULL
+            ORDER BY r.race_date
+        """)
+        dates = [row[0] for row in cur.fetchall()]
+        conn.close()
+
+        if not dates:
+            logger.info("補完対象の日付なし")
+            return
+
+        logger.info("補完対象日数: %d", len(dates))
+        for i, date_compact in enumerate(dates, 1):
+            # YYYYMMDD → YYYY-MM-DD
+            try:
+                dt = datetime.strptime(date_compact, "%Y%m%d")
+            except ValueError:
+                continue
+            date_str = dt.strftime("%Y-%m-%d")
+            logger.info("[%d/%d] %s の補完", i, len(dates), date_str)
+            try:
+                self.supplement_entries_for_date(date_str)
+            except Exception as e:
+                logger.error("[%s] 補完エラー: %s", date_str, e)
+                self._log_failed(f"supplement_{date_str}", str(e))
+
+
+# =========================================================
 # コマンドラインインターフェース
 # =========================================================
 
@@ -844,6 +1422,10 @@ def main():
     parser.add_argument("--jyo_cds", type=str, default=None,
                         help="対象JKAコード（カンマ区切り、例: 47,81）"
                              "省略時は全43会場")
+    parser.add_argument("--supplement", type=str, default=None,
+                        help="Kドリームズ補完を指定日(YYYY-MM-DD)で実行")
+    parser.add_argument("--supplement_all", action="store_true",
+                        help="Kドリームズ補完をDB全体の未補完分に実行")
 
     args = parser.parse_args()
 
@@ -857,6 +1439,22 @@ def main():
         except ValueError as e:
             logger.error("--jyo_cds の形式が不正: %s", e)
             return
+
+    # Kドリームズ補完モード
+    if args.supplement or args.supplement_all:
+        try:
+            supp = KdreamsSupplementScraper(
+                db_path=args.db,
+                delay=args.delay,
+            )
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            return
+        if args.supplement_all:
+            supp.supplement_missing_all()
+        else:
+            supp.supplement_entries_for_date(args.supplement)
+        return
 
     scraper = ChariLotoScraper(
         db_path=args.db,
