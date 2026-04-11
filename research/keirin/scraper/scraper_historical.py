@@ -5,20 +5,37 @@
 # 対象：chariloto.com（公開ページ・ログイン不要）
 # 保存先：SQLite（data/keirin/keirin.db）
 #
+# v0.13:
+#   - JKA公式会場コード（11〜87）を使うように変更
+#   - 日付フォーマットを YYYY-MM-DD に変更
+#   - pd.read_html() を io.StringIO() でラップ
+#   - 年別インデックス（?year=YYYY）から実在日付のみ取得
+#   - 結果ページ1枚に全レース（1R〜12R）が含まれることを前提に
+#     出走表の別ページ取得を廃止
+#   - 周回予想（ライン）を <span class="p10"> 区切りでパース
+#
 # 注意：このファイルはスクレイピングコードのため
 #       note販売パッケージには含めない
 # ===========================================
 
 import argparse
+import io
 import logging
 import re
 import sqlite3
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 import requests
+from bs4 import BeautifulSoup
+
+# bank_master.py を参照（JKA会場コード取得）
+_BANK_PATH = Path(__file__).resolve().parent.parent / "data"
+sys.path.insert(0, str(_BANK_PATH))
+from bank_master import BANK_MASTER  # noqa: E402
 
 # ログ設定
 logging.basicConfig(
@@ -35,34 +52,48 @@ PROGRESS_DIR = Path(__file__).resolve().parent
 
 BASE_URL = "https://www.chariloto.com"
 
-# chariloto.com で使われる会場コード（01〜43）
-# bank_master.py の venue_id に対応
-JYO_CODES = [f"{i:02d}" for i in range(1, 44)]
+# bank_master から JKA会場コード一覧を生成
+# 例: ["11", "12", "13", "21", "22", ...]
+JKA_CODES = sorted({info["jka_code"] for info in BANK_MASTER.values()
+                    if info.get("jka_code")})
+
+# jka_code → venue_id（bank_master内部ID "01"〜"43"）の逆引き
+JKA_TO_VENUE_ID = {
+    info["jka_code"]: info["venue_id"]
+    for info in BANK_MASTER.values()
+    if info.get("jka_code")
+}
 
 
 class ChariLotoScraper:
-    """chariloto.com から競輪の過去レース結果・出走表を取得する"""
+    """chariloto.com から競輪の過去レース結果を取得する"""
 
     def __init__(self, db_path=None, delay=2.0, jyo_cds=None):
         """
         Parameters:
             db_path: SQLiteファイルのパス（デフォルト: data/keirin/keirin.db）
             delay: リクエスト間の待機秒数（サーバー負荷配慮）
-            jyo_cds: 対象会場コードのリスト（int または "01"〜"43" 形式）
+            jyo_cds: 対象会場コードのリスト（JKAコード: 11〜87）
+                     int または str を受け付け、内部で "11"〜"87" 形式に正規化
                      None の場合は全43会場を対象
         """
         self.db_path = Path(db_path) if db_path else DB_PATH
         self.delay = delay
-        # 会場コードを "01"〜"43" 形式に正規化
+        # 会場コードを "11"〜"87" 形式（JKAコード）に正規化
         if jyo_cds is None:
-            self.jyo_cds = list(JYO_CODES)
+            self.jyo_cds = list(JKA_CODES)
         else:
             self.jyo_cds = [f"{int(c):02d}" for c in jyo_cds]
-        # 並列実行時の進捗ファイル（対象会場グループ別）
+            # 未定義の JKA コードをチェック
+            invalid = [c for c in self.jyo_cds if c not in JKA_CODES]
+            if invalid:
+                logger.warning("未定義のJKAコードを除外: %s", invalid)
+                self.jyo_cds = [c for c in self.jyo_cds if c in JKA_CODES]
         self.progress_file = self._make_progress_file()
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": "KeirinDataCollector/1.0 (personal research use)",
+            "User-Agent": "Mozilla/5.0 (KeirinDataCollector/1.0; "
+                          "personal research use)",
             "Accept-Language": "ja,en;q=0.9",
         })
         self._init_db()
@@ -72,19 +103,14 @@ class ChariLotoScraper:
         対象会場グループごとに進捗ファイルを分離する。
         並列実行時に互いの進捗を上書きしないため。
         """
-        if len(self.jyo_cds) == len(JYO_CODES):
+        if len(self.jyo_cds) == len(JKA_CODES):
             return PROGRESS_DIR / ".scrape_progress"
-        # 先頭と末尾のコードでサフィックスを作る
         suffix = f"{self.jyo_cds[0]}_{self.jyo_cds[-1]}"
         return PROGRESS_DIR / f".scrape_progress_{suffix}"
 
     def _connect_db(self) -> sqlite3.Connection:
         """
         DBに接続し WAL モードを有効化する。
-
-        WAL モード:
-          複数プロセスから同時書き込みしても競合しない。
-          synchronous=NORMAL でディスクI/Oを軽減。
         """
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -93,7 +119,7 @@ class ChariLotoScraper:
         return conn
 
     def _init_db(self):
-        """DBスキーマを初期化する（WALモード有効化も実施）"""
+        """DBスキーマを初期化する"""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = self._connect_db()
         cur = conn.cursor()
@@ -151,12 +177,7 @@ class ChariLotoScraper:
         time.sleep(self.delay)
 
     def _fetch_html(self, url, max_retries=3):
-        """
-        URLからHTMLを取得する。リトライ付き。
-
-        Returns:
-            str: HTMLテキスト。取得失敗時はNone。
-        """
+        """URLからHTMLを取得する。リトライ付き。"""
         for attempt in range(1, max_retries + 1):
             try:
                 resp = self.session.get(url, timeout=30)
@@ -164,25 +185,25 @@ class ChariLotoScraper:
                     logger.debug("404 Not Found: %s", url)
                     return None
                 if resp.status_code == 503:
-                    logger.warning("503 Service Unavailable: %s (attempt %d/%d)",
+                    logger.warning("503 Service Unavailable: %s (%d/%d)",
                                    url, attempt, max_retries)
                     time.sleep(2 ** attempt)
                     continue
                 resp.raise_for_status()
-                resp.encoding = resp.apparent_encoding
+                resp.encoding = "utf-8"
                 return resp.text
             except requests.RequestException as e:
-                logger.warning("リクエストエラー: %s (attempt %d/%d): %s",
+                logger.warning("リクエストエラー: %s (%d/%d): %s",
                                url, attempt, max_retries, e)
                 if attempt < max_retries:
                     time.sleep(2 ** attempt)
         return None
 
-    def _log_failed(self, race_id, reason):
-        """失敗したrace_idをログに記録する"""
+    def _log_failed(self, identifier, reason):
+        """失敗情報をログファイルに記録する"""
         with open(FAILED_LOG, "a", encoding="utf-8") as f:
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"{ts}\t{race_id}\t{reason}\n")
+            f.write(f"{ts}\t{identifier}\t{reason}\n")
 
     def _get_scraped_race_ids(self):
         """取得済みのrace_idセットを返す"""
@@ -193,310 +214,341 @@ class ChariLotoScraper:
         conn.close()
         return ids
 
-    def _get_scraped_dates(self):
-        """取得済みの日付セットを返す"""
-        conn = self._connect_db()
-        cur = conn.cursor()
-        cur.execute("SELECT DISTINCT race_date FROM races")
-        dates = {row[0] for row in cur.fetchall()}
-        conn.close()
-        return dates
-
     # =========================================================
-    # 結果ページのスクレイピング
+    # 年別インデックスから実在日付リストを取得
     # =========================================================
 
-    def scrape_race_result(self, jyo_cd, date_str):
+    def get_race_dates_for_venue_year(self, jka_code, year):
         """
-        1会場・1日分のレース結果を取得する。
+        指定会場・年の開催日リストを取得する。
 
-        URL: https://www.chariloto.com/keirin/results/{jyo_cd}/{date}
+        URL: /keirin/results/{jka_code}?year={year}
 
         Parameters:
-            jyo_cd: 会場コード（"01"〜"43"）
-            date_str: "YYYYMMDD" 形式
+            jka_code: JKA会場コード（"11"〜"87"）
+            year    : 西暦（int）
 
         Returns:
-            list[dict]: レース結果のリスト。取得失敗時は空リスト。
+            list[str]: "YYYY-MM-DD" 形式の開催日リスト（昇順）
         """
-        # URLの日付フォーマット（YYYY-MM-DD or YYYYMMDD はサイトに合わせる）
-        url = f"{BASE_URL}/keirin/results/{jyo_cd}/{date_str}"
+        url = f"{BASE_URL}/keirin/results/{jka_code}?year={year}"
         html = self._fetch_html(url)
         if html is None:
             return []
 
+        # /keirin/results/{jka_code}/{YYYY-MM-DD} のリンクを全抽出
+        pattern = re.compile(
+            rf"/keirin/results/{jka_code}/(\d{{4}}-\d{{2}}-\d{{2}})"
+        )
+        dates = sorted(set(pattern.findall(html)))
+        return dates
+
+    # =========================================================
+    # 1日分の結果ページを取得・パース
+    # =========================================================
+
+    def scrape_race_result(self, jka_code, date_str):
+        """
+        1会場・1日分のレース結果ページを取得し、全レースをパースする。
+
+        URL: https://www.chariloto.com/keirin/results/{jka_code}/{YYYY-MM-DD}
+
+        Parameters:
+            jka_code : JKA会場コード（"11"〜"87"）
+            date_str : "YYYY-MM-DD" 形式
+
+        Returns:
+            list[dict]: 各レースのデータ。取得失敗時は空リスト。
+              [
+                {
+                  "race_id", "jyo_cd", "race_date", "race_no",
+                  "results":  [着順情報のリスト],
+                  "entries":  [出走情報のリスト],
+                  "line_info": {sha_ban: (line_id, line_pos)},
+                },
+                ...
+              ]
+        """
+        url = f"{BASE_URL}/keirin/results/{jka_code}/{date_str}"
+        html = self._fetch_html(url)
+        if html is None:
+            return []
+
+        # venue_id（bank_master内部ID "01"〜"43"）を取得
+        venue_id = JKA_TO_VENUE_ID.get(jka_code)
+        if venue_id is None:
+            logger.warning("venue_id が見つかりません: jka_code=%s", jka_code)
+            return []
+
+        # YYYYMMDD 形式の日付（race_id生成用）
         try:
-            dfs = pd.read_html(html)
-        except (ValueError, ImportError, Exception) as e:
-            # テーブルなし / パーサ不在 / その他パースエラー
-            logger.debug("read_html失敗 %s: %s", url, e)
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            date_compact = dt.strftime("%Y%m%d")
+        except ValueError:
+            logger.error("日付パース失敗: %s", date_str)
+            return []
+
+        # BeautifulSoup と pandas 両方でパース
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+            dfs = pd.read_html(io.StringIO(html))
+        except Exception as e:
+            logger.debug("HTMLパース失敗 %s: %s", url, e)
             return []
 
         if not dfs:
             return []
 
-        results = []
-        for i, df in enumerate(dfs):
+        # レース数を table[0]（開催レース一覧）から取得
+        # 例: ['開催レース', '1R', '2R', '3R', ..., '12R']
+        n_races = 0
+        try:
+            first_row = list(dfs[0].iloc[0].values)
+            race_cells = [str(v) for v in first_row[1:]
+                          if re.match(r"^\d+R$", str(v))]
+            n_races = len(race_cells)
+        except Exception:
+            pass
+
+        if n_races == 0:
+            logger.debug("レース数不明: %s", url)
+            return []
+
+        # 結果テーブル(着順)は table[0] の次から順番に並ぶ
+        # パターン: [result_table, shukai_prediction, narabi, haito, haito, ...]
+        # 結果テーブルは columns に "着", "車番", "選手名" を含むことで判別
+
+        race_results = self._extract_race_tables(dfs)
+        # 周回予想（ライン情報）を BS4 から取得
+        line_info_list = self._extract_line_info(soup)
+
+        # レース別に組み立て
+        parsed_races = []
+        for i in range(n_races):
+            if i >= len(race_results):
+                break
+            result_rows = race_results[i]
+            if not result_rows:
+                continue
+
             race_no = i + 1
-            race_id = f"{jyo_cd}_{date_str}_{race_no:02d}"
+            race_id = f"{venue_id}_{date_compact}_{race_no:02d}"
 
-            # 結果テーブルから着順・車番・選手名・決まり手を抽出
-            parsed = self._parse_result_table(df, race_id)
-            if parsed:
-                results.append({
-                    "race_id": race_id,
-                    "jyo_cd": int(jyo_cd),
-                    "race_date": date_str,
-                    "race_no": race_no,
-                    "results": parsed["results"],
-                    "line_info": parsed.get("line_info", []),
-                })
+            # ライン情報（i番目が取れなければ空）
+            line_info = line_info_list[i] if i < len(line_info_list) else {}
 
-        return results
-
-    def _parse_result_table(self, df, race_id):
-        """
-        結果テーブルのDataFrameをパースする。
-
-        カラム名はサイトのHTML構造に依存するため、
-        位置ベース・名前ベースの両方で対応する。
-
-        Returns:
-            dict: {"results": [...], "line_info": [...]}
-            パースできない場合はNone。
-        """
-        if df.empty:
-            return None
-
-        # カラム名を正規化（全角スペース・改行除去）
-        df.columns = [str(c).strip().replace("\n", "").replace(" ", "")
-                      for c in df.columns]
-
-        results = []
-        line_raw = None
-
-        # 着順カラムの候補
-        rank_col = self._find_column(df, ["着順", "着", "順位"])
-        sha_ban_col = self._find_column(df, ["車番", "車", "枠番"])
-        name_col = self._find_column(df, ["選手名", "選手", "氏名"])
-        kimari_col = self._find_column(df, ["決まり手", "決り手", "決手"])
-
-        if rank_col is None or sha_ban_col is None:
-            # カラムが見つからない場合、位置ベースで試行
-            if len(df.columns) >= 3:
-                rank_col = df.columns[0]
-                sha_ban_col = df.columns[1]
-                name_col = df.columns[2] if len(df.columns) > 2 else None
-                kimari_col = None
-            else:
-                return None
-
-        for _, row in df.iterrows():
-            try:
-                rank_val = row[rank_col]
-                # 着順が数値でない行（ヘッダー重複等）をスキップ
-                rank = self._to_int(rank_val)
-                if rank is None or rank < 1 or rank > 9:
-                    continue
-
-                sha_ban = self._to_int(row[sha_ban_col])
+            # 1〜3着の結果
+            results = []
+            entries = []
+            for row in result_rows:
+                rank = row.get("rank")
+                sha_ban = row.get("sha_ban")
                 if sha_ban is None:
                     continue
 
-                senshu_name = str(row[name_col]).strip() if name_col else ""
-                kimari_te = str(row[kimari_col]).strip() if kimari_col and pd.notna(row.get(kimari_col)) else ""
-
-                # 1〜3着のみ保存
-                if rank <= 3:
+                # 1〜3着のみ results テーブルへ
+                if rank is not None and 1 <= rank <= 3:
+                    line_id, line_pos = line_info.get(sha_ban, (None, None))
                     results.append({
                         "race_id": race_id,
                         "rank": rank,
                         "sha_ban": sha_ban,
-                        "senshu_name": senshu_name,
-                        "kimari_te": kimari_te,
+                        "senshu_name": row.get("senshu_name"),
+                        "kimari_te": row.get("kimari_te"),
+                        "line_id": line_id,
+                        "line_pos": line_pos,
                     })
-            except Exception as e:
-                logger.debug("行パースエラー (race_id=%s): %s", race_id, e)
+
+                # 全選手 entries テーブルへ
+                entries.append({
+                    "race_id": race_id,
+                    "sha_ban": sha_ban,
+                    "senshu_name": row.get("senshu_name"),
+                    "age": row.get("age"),
+                    "ki_betsu": row.get("ki_betsu"),
+                    "todofuken": row.get("todofuken"),
+                    # 以下は結果ページには無い（別ページ or 現状取得不可）
+                    "kyoso_tokuten": None,
+                    "gear_ratio": None,
+                    "back_count": None,
+                    "home_count": None,
+                    "kyakushitsu": None,
+                })
+
+            if results:
+                parsed_races.append({
+                    "race_id": race_id,
+                    "jyo_cd": int(venue_id),
+                    "race_date": date_compact,
+                    "race_no": race_no,
+                    "results": results,
+                    "entries": entries,
+                    "line_info": line_info,
+                })
+
+        return parsed_races
+
+    def _extract_race_tables(self, dfs):
+        """
+        pd.read_html() の結果リストから、各レースの着順テーブルを抽出する。
+
+        着順テーブルは列に "着", "車番", "選手名" を持つ。
+
+        Returns:
+            list[list[dict]]: レース順に並んだ着順行リスト
+        """
+        race_list = []
+        for df in dfs:
+            try:
+                cols = [str(c).strip() for c in df.columns]
+            except Exception:
                 continue
 
-        if not results:
-            return None
+            has_rank = any("着" == c or c == "順位" for c in cols)
+            has_sha_ban = any("車番" in c for c in cols)
+            has_name = any("選手名" in c for c in cols)
+            if not (has_rank and has_sha_ban and has_name):
+                continue
 
-        return {"results": results, "line_info": []}
+            rank_col = self._find_col(cols, ["着", "順位"])
+            sha_ban_col = self._find_col(cols, ["車番"])
+            name_col = self._find_col(cols, ["選手名"])
+            age_col = self._find_col(cols, ["年齢"])
+            pref_col = self._find_col(cols, ["府県", "都道府県"])
+            ki_col = self._find_col(cols, ["期別"])
+            kimari_col = self._find_col(cols, ["決まり手", "決り手"])
 
-    def _find_column(self, df, candidates):
-        """候補のカラム名からDataFrame内に存在するものを返す"""
-        for c in candidates:
-            for col in df.columns:
-                if c in str(col):
-                    return col
+            rows = []
+            for _, row in df.iterrows():
+                rank = self._to_int(row.get(rank_col))
+                sha_ban = self._to_int(row.get(sha_ban_col))
+                if sha_ban is None:
+                    continue
+                rows.append({
+                    "rank": rank,
+                    "sha_ban": sha_ban,
+                    "senshu_name": self._clean_str(row.get(name_col)),
+                    "age": self._to_int(row.get(age_col)) if age_col else None,
+                    "todofuken": self._clean_str(row.get(pref_col))
+                                 if pref_col else None,
+                    "ki_betsu": self._to_int(row.get(ki_col))
+                                if ki_col else None,
+                    "kimari_te": self._clean_str(row.get(kimari_col))
+                                 if kimari_col else None,
+                })
+
+            if rows:
+                race_list.append(rows)
+
+        return race_list
+
+    def _extract_line_info(self, soup):
+        """
+        周回予想（ライン情報）を抽出する。
+
+        HTML構造:
+          <tr>
+            <th>周回予想</th>
+            <td>
+              <table>
+                <tr>
+                  <td><span class="square ... bg-1">1</span></td>
+                  <td><span class="square ... bg-4">4</span></td>
+                  ...
+                  <td><span class="p10"></span></td>  ← ライン区切り（空セル）
+                  <td><span class="square ... bg-3">3</span></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        Returns:
+            list[dict]: レース順に並んだ {sha_ban: (line_id, line_pos)} 辞書
+        """
+        result = []
+
+        # "周回予想" を含む tr を全て取得
+        for th in soup.find_all("th"):
+            if th.get_text(strip=True) != "周回予想":
+                continue
+
+            parent_tr = th.find_parent("tr")
+            if parent_tr is None:
+                continue
+
+            # 隣の td 内の inner table の各 td を順に走査
+            td = th.find_next_sibling("td")
+            if td is None:
+                continue
+
+            cells = td.find_all("td")
+            line_map = {}  # sha_ban → (line_id, line_pos)
+            line_id = 1
+            line_pos = 1
+            last_was_empty = False
+
+            for cell in cells:
+                span = cell.find("span")
+                if span is None:
+                    continue
+                classes = span.get("class", [])
+                # 空セル = ライン区切り
+                is_empty = "p10" in classes
+                if is_empty:
+                    # 連続する空セルは1回のライン区切り扱い
+                    if not last_was_empty and line_pos > 1:
+                        line_id += 1
+                        line_pos = 1
+                    last_was_empty = True
+                    continue
+
+                # 車番セル
+                text = span.get_text(strip=True)
+                try:
+                    sha_ban = int(text)
+                except ValueError:
+                    continue
+
+                line_map[sha_ban] = (line_id, line_pos)
+                line_pos += 1
+                last_was_empty = False
+
+            result.append(line_map)
+
+        return result
+
+    def _find_col(self, cols, candidates):
+        """カラム候補から一致するものを返す"""
+        for cand in candidates:
+            for c in cols:
+                if cand in c:
+                    return c
         return None
 
     def _to_int(self, val):
         """値をintに変換。失敗時はNone。"""
-        if pd.isna(val):
+        if val is None or pd.isna(val):
             return None
         try:
             return int(float(str(val).strip()))
         except (ValueError, TypeError):
             return None
 
-    def _to_float(self, val):
-        """値をfloatに変換。失敗時はNone。"""
-        if pd.isna(val):
+    def _clean_str(self, val):
+        """文字列を正規化。nanや空はNone。"""
+        if val is None or pd.isna(val):
             return None
-        try:
-            return float(str(val).strip())
-        except (ValueError, TypeError):
+        s = str(val).strip().replace("\u3000", " ")
+        if s in ("", "nan", "NaN", "None"):
             return None
-
-    # =========================================================
-    # 並び（ライン）のパース
-    # =========================================================
-
-    def _parse_line_from_result(self, line_text):
-        """
-        並びテキストをライン番号に変換する。
-
-        入力例: "1-2-3　4-5　6-7"
-        出力: {1: (1,1), 2: (1,2), 3: (1,3), 4: (2,1), 5: (2,2), 6: (3,1), 7: (3,2)}
-              → {車番: (line_id, line_pos)}
-
-        単騎（ハイフンなしの単独番号）はライン番号=自動採番、ポジション=1
-
-        Parameters:
-            line_text: "1-2-3　4-5　6-7" 形式の文字列
-
-        Returns:
-            dict: {sha_ban: (line_id, line_pos)}
-        """
-        if not line_text or not isinstance(line_text, str):
-            return {}
-
-        # 全角スペース・半角スペース・タブで分割
-        groups = re.split(r'[\s　]+', line_text.strip())
-        result = {}
-        line_id = 1
-
-        for group in groups:
-            if not group:
-                continue
-            # ハイフン区切りで車番を分解（全角・半角対応）
-            members = re.split(r'[-\-ー]', group)
-            pos = 1
-            for m in members:
-                m = m.strip()
-                if not m:
-                    continue
-                try:
-                    sha_ban = int(m)
-                    result[sha_ban] = (line_id, pos)
-                    pos += 1
-                except ValueError:
-                    continue
-            if pos > 1:  # 少なくとも1人はパースできた
-                line_id += 1
-
-        return result
-
-    # =========================================================
-    # 出走表のスクレイピング
-    # =========================================================
-
-    def scrape_race_entry(self, jyo_cd, date_str, race_no):
-        """
-        1レース分の出走表を取得する。
-
-        URL: https://www.chariloto.com/keirin/race/{jyo_cd}/{date}/{race_no}
-
-        Parameters:
-            jyo_cd: 会場コード
-            date_str: "YYYYMMDD" 形式
-            race_no: レース番号
-
-        Returns:
-            list[dict]: 出走選手リスト。取得失敗時は空リスト。
-        """
-        url = f"{BASE_URL}/keirin/race/{jyo_cd}/{date_str}/{race_no}"
-        html = self._fetch_html(url)
-        if html is None:
-            return []
-
-        try:
-            dfs = pd.read_html(html)
-        except (ValueError, ImportError, Exception) as e:
-            logger.debug("read_html失敗 %s: %s", url, e)
-            return []
-
-        if not dfs:
-            return []
-
-        race_id = f"{jyo_cd}_{date_str}_{race_no:02d}"
-        entries = self._parse_entry_table(dfs[0], race_id)
-        return entries
-
-    def _parse_entry_table(self, df, race_id):
-        """
-        出走表のDataFrameをパースする。
-
-        Returns:
-            list[dict]: 出走選手データのリスト
-        """
-        if df.empty:
-            return []
-
-        # カラム名正規化
-        df.columns = [str(c).strip().replace("\n", "").replace(" ", "")
-                      for c in df.columns]
-
-        sha_ban_col = self._find_column(df, ["車番", "車", "枠"])
-        name_col = self._find_column(df, ["選手名", "選手", "氏名"])
-        age_col = self._find_column(df, ["年齢", "齢"])
-        ki_col = self._find_column(df, ["期別", "期"])
-        pref_col = self._find_column(df, ["府県", "都道府県", "県", "地区"])
-        tokuten_col = self._find_column(df, ["競走得点", "得点", "得"])
-        gear_col = self._find_column(df, ["ギア", "ギヤ", "gear", "G倍"])
-        back_col = self._find_column(df, ["バック", "B回", "B数"])
-        home_col = self._find_column(df, ["ホーム", "H回", "H数"])
-        style_col = self._find_column(df, ["脚質", "脚"])
-
-        entries = []
-        for _, row in df.iterrows():
-            sha_ban = self._to_int(row.get(sha_ban_col)) if sha_ban_col else None
-            if sha_ban is None or sha_ban < 1 or sha_ban > 9:
-                continue
-
-            entry = {
-                "race_id": race_id,
-                "sha_ban": sha_ban,
-                "senshu_name": str(row.get(name_col, "")).strip() if name_col else "",
-                "age": self._to_int(row.get(age_col)) if age_col else None,
-                "ki_betsu": self._to_int(row.get(ki_col)) if ki_col else None,
-                "todofuken": str(row.get(pref_col, "")).strip() if pref_col else None,
-                "kyoso_tokuten": self._to_float(row.get(tokuten_col)) if tokuten_col else None,
-                "gear_ratio": self._to_float(row.get(gear_col)) if gear_col else None,
-                "back_count": self._to_int(row.get(back_col)) if back_col else None,
-                "home_count": self._to_int(row.get(home_col)) if home_col else None,
-                "kyakushitsu": str(row.get(style_col, "")).strip() if style_col else None,
-            }
-            entries.append(entry)
-
-        return entries
+        return s
 
     # =========================================================
     # DB保存
     # =========================================================
 
     def _save_to_db(self, races, results, entries):
-        """
-        レース・結果・出走表をDBに保存する。
-        取得済みのrace_idはスキップ（重複防止）。
-
-        Parameters:
-            races: list[dict]   - racesテーブル用データ
-            results: list[dict] - resultsテーブル用データ
-            entries: list[dict] - entriesテーブル用データ
-        """
+        """レース・結果・出走表をDBに保存する"""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         conn = self._connect_db()
         cur = conn.cursor()
@@ -505,7 +557,8 @@ class ChariLotoScraper:
             try:
                 cur.execute("""
                     INSERT OR IGNORE INTO races
-                    (race_id, jyo_cd, race_date, race_no, grade, stage, created_at)
+                    (race_id, jyo_cd, race_date, race_no,
+                     grade, stage, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     race["race_id"],
@@ -538,7 +591,7 @@ class ChariLotoScraper:
                     now,
                 ))
             except sqlite3.Error as e:
-                logger.warning("results INSERT エラー (race_id=%s, rank=%d): %s",
+                logger.warning("results INSERT エラー (race_id=%s rank=%d): %s",
                                r["race_id"], r["rank"], e)
 
         for e in entries:
@@ -564,79 +617,11 @@ class ChariLotoScraper:
                     now,
                 ))
             except sqlite3.Error as e_err:
-                logger.warning("entries INSERT エラー (race_id=%s, sha_ban=%s): %s",
+                logger.warning("entries INSERT エラー (race_id=%s sha_ban=%s): %s",
                                e["race_id"], e.get("sha_ban"), e_err)
 
         conn.commit()
         conn.close()
-
-    # =========================================================
-    # 1日分のスクレイピング
-    # =========================================================
-
-    def scrape_day(self, date_str):
-        """
-        指定日の全会場のレース結果・出走表を取得する。
-
-        Parameters:
-            date_str: "YYYYMMDD" 形式
-        """
-        scraped_ids = self._get_scraped_race_ids()
-        day_races = []
-        day_results = []
-        day_entries = []
-
-        for jyo_cd in self.jyo_cds:
-            try:
-                # 結果ページを取得
-                race_data_list = self.scrape_race_result(jyo_cd, date_str)
-                if not race_data_list:
-                    continue
-
-                logger.info("[%s] 会場 %s: %d レース検出",
-                            date_str, jyo_cd, len(race_data_list))
-
-                for race_data in race_data_list:
-                    race_id = race_data["race_id"]
-
-                    # 取得済みスキップ
-                    if race_id in scraped_ids:
-                        logger.debug("[SKIP] %s は取得済み", race_id)
-                        continue
-
-                    # races テーブル用
-                    day_races.append({
-                        "race_id": race_id,
-                        "jyo_cd": race_data["jyo_cd"],
-                        "race_date": date_str,
-                        "race_no": race_data["race_no"],
-                    })
-
-                    # results テーブル用
-                    day_results.extend(race_data["results"])
-
-                    # 出走表を取得
-                    self._polite_sleep()
-                    entry_list = self.scrape_race_entry(
-                        jyo_cd, date_str, race_data["race_no"]
-                    )
-                    day_entries.extend(entry_list)
-
-                self._polite_sleep()
-            except Exception as e:
-                # 1会場でエラーが出ても他の会場は続行する
-                logger.error("[%s] 会場 %s スキップ: %s", date_str, jyo_cd, e)
-                self._log_failed(f"{jyo_cd}_{date_str}", str(e))
-                continue
-
-        # DB保存
-        if day_races:
-            self._save_to_db(day_races, day_results, day_entries)
-            logger.info("[%s] 保存完了: %d レース, %d 結果, %d 出走",
-                        date_str, len(day_races), len(day_results),
-                        len(day_entries))
-        else:
-            logger.info("[%s] 取得対象なし（開催なし or 取得済み）", date_str)
 
     # =========================================================
     # 期間指定でまとめて取得
@@ -646,55 +631,122 @@ class ChariLotoScraper:
         """
         指定期間のレースデータをまとめて取得する。
 
-        Parameters:
-            start_date: "YYYY-MM-DD" or "YYYYMMDD" 形式
-            end_date:   "YYYY-MM-DD" or "YYYYMMDD" 形式
+        年別インデックス（?year=YYYY）から実在開催日のみを抽出してアクセス。
         """
         start_dt = self._parse_date(start_date)
         end_dt = self._parse_date(end_date)
 
         if start_dt is None or end_dt is None:
-            logger.error("日付のパースに失敗しました: start=%s, end=%s",
+            logger.error("日付のパース失敗: start=%s end=%s",
                          start_date, end_date)
             return
 
-        total_days = (end_dt - start_dt).days + 1
-        current = start_dt
-        day_count = 0
-
         logger.info("=== スクレイピング開始 ===")
-        logger.info("期間: %s 〜 %s（%d日間）",
-                     start_dt.strftime("%Y-%m-%d"),
-                     end_dt.strftime("%Y-%m-%d"),
-                     total_days)
+        logger.info("期間: %s 〜 %s",
+                    start_dt.strftime("%Y-%m-%d"),
+                    end_dt.strftime("%Y-%m-%d"))
         logger.info("対象会場: %d場 (%s)",
                     len(self.jyo_cds),
                     ",".join(self.jyo_cds))
         logger.info("進捗ファイル: %s", self.progress_file.name)
 
+        scraped_ids = self._get_scraped_race_ids()
+
+        # 期間内の年を列挙
+        years = set()
+        current = start_dt
         while current <= end_dt:
-            date_str = current.strftime("%Y%m%d")
-            day_count += 1
-            logger.info("[%d/%d] %s", day_count, total_days,
-                        current.strftime("%Y-%m-%d"))
+            years.add(current.year)
+            current += timedelta(days=32)
+            current = current.replace(day=1)
+        years = sorted(years)
 
-            try:
-                self.scrape_day(date_str)
-            except Exception as e:
-                logger.error("[%s] 予期せぬエラー: %s", date_str, e)
-                self._log_failed(f"day_{date_str}", str(e))
+        total_saved = 0
 
-            # 進捗を保存（--resume用）
-            self._save_progress(current.strftime("%Y-%m-%d"),
-                                end_dt.strftime("%Y-%m-%d"))
+        # 会場 × 年 × 実在日付 のループ
+        for jka_code in self.jyo_cds:
+            venue_name = self._get_venue_name(jka_code)
+            for year in years:
+                try:
+                    dates = self.get_race_dates_for_venue_year(jka_code, year)
+                except Exception as e:
+                    logger.error("年別インデックス取得失敗 %s/%d: %s",
+                                 jka_code, year, e)
+                    self._log_failed(f"index_{jka_code}_{year}", str(e))
+                    continue
 
-            current += timedelta(days=1)
+                # 期間内の日付だけ残す
+                target_dates = [
+                    d for d in dates
+                    if start_dt <= datetime.strptime(d, "%Y-%m-%d") <= end_dt
+                ]
+                if not target_dates:
+                    self._polite_sleep()
+                    continue
 
-        logger.info("=== スクレイピング完了 ===")
+                logger.info("[%s/%s] %d年: %d日分",
+                            jka_code, venue_name, year, len(target_dates))
+
+                for date_str in target_dates:
+                    try:
+                        parsed_races = self.scrape_race_result(
+                            jka_code, date_str
+                        )
+                    except Exception as e:
+                        logger.error("[%s %s] 取得失敗: %s",
+                                     jka_code, date_str, e)
+                        self._log_failed(f"{jka_code}_{date_str}", str(e))
+                        self._polite_sleep()
+                        continue
+
+                    if not parsed_races:
+                        self._polite_sleep()
+                        continue
+
+                    # 取得済みスキップ
+                    day_races = []
+                    day_results = []
+                    day_entries = []
+                    for pr in parsed_races:
+                        if pr["race_id"] in scraped_ids:
+                            continue
+                        day_races.append({
+                            "race_id": pr["race_id"],
+                            "jyo_cd": pr["jyo_cd"],
+                            "race_date": pr["race_date"],
+                            "race_no": pr["race_no"],
+                        })
+                        day_results.extend(pr["results"])
+                        day_entries.extend(pr["entries"])
+                        scraped_ids.add(pr["race_id"])
+
+                    if day_races:
+                        self._save_to_db(day_races, day_results, day_entries)
+                        total_saved += len(day_races)
+                        logger.info("  [%s] 保存: %d レース, %d 結果, %d 出走",
+                                    date_str, len(day_races),
+                                    len(day_results), len(day_entries))
+
+                    self._polite_sleep()
+
+                # 年ごとの進捗保存
+                self._save_progress(
+                    f"{jka_code}_{year}",
+                    end_dt.strftime("%Y-%m-%d"),
+                )
+
+        logger.info("=== スクレイピング完了: %d レース保存 ===", total_saved)
         self.get_status()
 
+    def _get_venue_name(self, jka_code):
+        """jka_code から会場名を取得"""
+        for name, info in BANK_MASTER.items():
+            if info.get("jka_code") == jka_code:
+                return name
+        return "unknown"
+
     def _parse_date(self, date_str):
-        """日付文字列をdatetimeに変換する"""
+        """日付文字列をdatetimeに変換"""
         for fmt in ("%Y-%m-%d", "%Y%m%d"):
             try:
                 return datetime.strptime(date_str, fmt)
@@ -702,17 +754,19 @@ class ChariLotoScraper:
                 continue
         return None
 
-    def _save_progress(self, last_date, end_date):
-        """進捗をファイルに保存する（--resume用・グループ別）"""
+    def _save_progress(self, last_marker, end_date):
+        """進捗をファイルに保存"""
         with open(self.progress_file, "w", encoding="utf-8") as f:
-            f.write(f"{last_date}\n{end_date}\n")
+            f.write(f"{last_marker}\n{end_date}\n")
 
     def _load_progress(self):
-        """保存された進捗を読み込む（グループ別）"""
+        """保存された進捗を読み込む"""
         if not self.progress_file.exists():
             return None, None
         try:
-            lines = self.progress_file.read_text(encoding="utf-8").strip().split("\n")
+            lines = self.progress_file.read_text(
+                encoding="utf-8"
+            ).strip().split("\n")
             if len(lines) >= 2:
                 return lines[0], lines[1]
         except Exception:
@@ -724,7 +778,7 @@ class ChariLotoScraper:
     # =========================================================
 
     def get_status(self):
-        """取得済み件数・進捗を表示する"""
+        """取得済み件数を表示"""
         conn = self._connect_db()
         cur = conn.cursor()
 
@@ -758,11 +812,6 @@ class ChariLotoScraper:
         print(f"  会場数:     {venue_count}")
         print("========================================\n")
 
-        # 保存された進捗
-        last_date, end_date = self._load_progress()
-        if last_date and end_date:
-            print(f"  前回の進捗: {last_date} まで取得済み（目標: {end_date}）")
-
         return {
             "race_count": race_count,
             "result_count": result_count,
@@ -782,25 +831,22 @@ def main():
     parser = argparse.ArgumentParser(
         description="競輪過去データスクレイパー（chariloto.com）"
     )
-    parser.add_argument("--start", type=str,
-                        help="開始日（YYYY-MM-DD）")
-    parser.add_argument("--end", type=str,
-                        help="終了日（YYYY-MM-DD）")
+    parser.add_argument("--start", type=str, help="開始日（YYYY-MM-DD）")
+    parser.add_argument("--end", type=str, help="終了日（YYYY-MM-DD）")
     parser.add_argument("--resume", action="store_true",
                         help="前回の続きから再開")
     parser.add_argument("--status", action="store_true",
-                        help="取得済み件数・進捗を表示")
+                        help="取得済み件数を表示")
     parser.add_argument("--delay", type=float, default=2.0,
                         help="リクエスト間隔（秒、デフォルト: 2.0）")
     parser.add_argument("--db", type=str, default=None,
-                        help="DBファイルパス（デフォルト: data/keirin/keirin.db）")
+                        help="DBファイルパス")
     parser.add_argument("--jyo_cds", type=str, default=None,
-                        help="対象会場コード（カンマ区切り、例: 1,2,3,4）。"
-                             "省略時は全43会場を対象")
+                        help="対象JKAコード（カンマ区切り、例: 47,81）"
+                             "省略時は全43会場")
 
     args = parser.parse_args()
 
-    # --jyo_cds のパース
     jyo_cds = None
     if args.jyo_cds:
         try:
@@ -808,11 +854,8 @@ def main():
                        if c.strip()]
             if not jyo_cds:
                 raise ValueError("会場コードが空")
-            for c in jyo_cds:
-                if c < 1 or c > 43:
-                    raise ValueError(f"会場コードは1〜43: {c}")
         except ValueError as e:
-            logger.error("--jyo_cds の形式が不正です: %s", e)
+            logger.error("--jyo_cds の形式が不正: %s", e)
             return
 
     scraper = ChariLotoScraper(
@@ -826,21 +869,22 @@ def main():
         return
 
     if args.resume:
-        last_date, end_date = scraper._load_progress()
-        if last_date is None or end_date is None:
-            # --start/--end が指定されていればそちらを優先して続行
+        last_marker, end_date = scraper._load_progress()
+        if last_marker is None or end_date is None:
             if args.start and args.end:
-                logger.info("進捗ファイルなし。--start/--end で新規実行します")
+                logger.info("進捗なし。--start/--end で新規実行")
                 scraper.scrape_range(args.start, args.end)
                 return
-            logger.error("再開用の進捗ファイルが見つかりません: %s",
-                         scraper.progress_file)
+            logger.error("再開用の進捗ファイルなし: %s", scraper.progress_file)
             return
-        # 前回の翌日から再開
-        resume_dt = datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)
-        resume_date = resume_dt.strftime("%Y-%m-%d")
-        logger.info("前回の続きから再開: %s 〜 %s", resume_date, end_date)
-        scraper.scrape_range(resume_date, end_date)
+        logger.info("前回の続きから再開: marker=%s end=%s",
+                    last_marker, end_date)
+        # 新規実装: 進捗は「年別インデックスで取得済みの会場×年」の最終位置
+        # を保持するが、シンプルに最初から再実行して取得済みスキップに任せる
+        if args.start:
+            scraper.scrape_range(args.start, end_date)
+        else:
+            logger.error("--start が必要（年の開始を指定してください）")
         return
 
     if args.start and args.end:
