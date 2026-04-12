@@ -1,6 +1,6 @@
 # ===========================================
 # model/feature_engine.py
-# 競輪AI - 特徴量エンジン（52特徴量）
+# 競輪AI - 特徴量エンジン（55特徴量）
 #
 # カテゴリ構成：
 #   A: 選手個人（12）  ← home_count除外（全件NULL・Kドリームズ非掲載）
@@ -11,7 +11,8 @@
 #   F: オッズ（6）
 #   G: レース構成（5）
 #   H: レース内相対（4）
-#   合計：51特徴量
+#   I: 履歴（4）← 当場勝率・トレンド・相性・Elo
+#   合計：55特徴量
 #
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
@@ -97,7 +98,7 @@ def create_features(entries_df, races_df, odds_df,
                     line_probs=None, bank_info=None,
                     db_path=None):
     """
-    全52特徴量を計算して返す。
+    全55特徴量を計算して返す。
 
     Parameters:
         entries_df : 出走情報DataFrame
@@ -137,9 +138,10 @@ def create_features(entries_df, races_df, odds_df,
     feat_f = calc_odds_features(odds_df, df, db_path=db_path)
     feat_g = calc_race_features(df, line_probs)
     feat_h = calc_relative_features(df, bank_info)
+    feat_i = calc_history_features(df, db_path=db_path)
 
     feature_frames = [feat_a, feat_b, feat_c, feat_d,
-                      feat_e, feat_f, feat_g, feat_h]
+                      feat_e, feat_f, feat_g, feat_h, feat_i]
 
     # 全てのカテゴリを横結合
     result = df[["race_id", "car_no"]].copy()
@@ -912,7 +914,464 @@ def calc_relative_features(df: pd.DataFrame,
 
 
 # =============================================================
-# 特徴量名一覧（51特徴量）
+# カテゴリI：履歴特徴量（4特徴量）← 新規
+# =============================================================
+
+def calc_history_features(df: pd.DataFrame,
+                          db_path=None) -> pd.DataFrame:
+    """
+    I-01 home_venue_win_rate（当場勝率）
+    I-02 recent_trend_score（直近トレンドスコア）
+    I-03 h2h_win_rate（対戦相手との相性スコア）
+    I-04 elo_rating（拡張Eloレーティング）
+
+    全ての計算で race_date < 当該レースの日付 を厳守し
+    データリークを防止する。
+
+    db_path が None の場合はデフォルト値で補完する。
+    """
+    out = df[["race_id", "car_no"]].copy()
+
+    if db_path is None or not Path(db_path).exists():
+        out["I01_home_venue_win_rate"] = 0.15  # 全体平均（未検証）
+        out["I02_recent_trend_score"]  = 0.0
+        out["I03_h2h_win_rate"]        = 0.5
+        out["I04_elo_rating"]          = 1500.0
+        return out
+
+    db = Path(db_path)
+
+    # インデックス追加（初回のみ・既存なら無視）
+    _ensure_history_indexes(db)
+
+    # 選手名・race_date・jyo_cd を df から取得
+    # senshu_name は entries 側の列を使う
+    name_col = None
+    for c in df.columns:
+        if "senshu_name" in c:
+            name_col = c
+            break
+
+    if name_col is None:
+        out["I01_home_venue_win_rate"] = 0.15
+        out["I02_recent_trend_score"]  = 0.0
+        out["I03_h2h_win_rate"]        = 0.5
+        out["I04_elo_rating"]          = 1500.0
+        return out
+
+    # race_date 列の確保（マージ済みなら date か race_date がある）
+    date_col = None
+    for c in ["race_date", "date"]:
+        if c in df.columns:
+            date_col = c
+            break
+
+    jyo_col = None
+    for c in ["jyo_cd", "venue_id"]:
+        if c in df.columns:
+            jyo_col = c
+            break
+
+    # I-01: 当場勝率
+    out["I01_home_venue_win_rate"] = df.apply(
+        lambda row: _calc_venue_win_rate(
+            row.get(name_col), row.get(jyo_col), row.get(date_col), db
+        ), axis=1
+    )
+
+    # I-02: 直近トレンドスコア
+    out["I02_recent_trend_score"] = df.apply(
+        lambda row: _calc_trend_score(
+            row.get(name_col), row.get(date_col), db
+        ), axis=1
+    )
+
+    # I-03: 対戦相手との相性
+    # レースごとにグループ化して計算
+    race_groups = df.groupby("race_id")
+    h2h_results = {}
+    for race_id, group in race_groups:
+        names_in_race = list(group[name_col].dropna().unique())
+        race_date = group[date_col].iloc[0] if date_col else None
+        for _, row in group.iterrows():
+            sname = row.get(name_col)
+            car_no = row["car_no"]
+            if sname and race_date:
+                opponents = [n for n in names_in_race if n != sname]
+                h2h_results[(race_id, car_no)] = _calc_h2h_win_rate(
+                    sname, opponents, race_date, db
+                )
+            else:
+                h2h_results[(race_id, car_no)] = 0.5
+
+    out["I03_h2h_win_rate"] = df.apply(
+        lambda row: h2h_results.get((row["race_id"], row["car_no"]), 0.5),
+        axis=1
+    )
+
+    # I-04: Eloレーティング
+    elo_map = _load_or_compute_elo(db, df, name_col, date_col)
+    out["I04_elo_rating"] = df.apply(
+        lambda row: elo_map.get(
+            (str(row.get(name_col, "")), str(row.get(date_col, ""))),
+            1500.0
+        ), axis=1
+    )
+
+    return out
+
+
+def _ensure_history_indexes(db_path):
+    """履歴特徴量用のインデックスを追加する（初回のみ）"""
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        conn.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_results_name
+                ON results(senshu_name);
+            CREATE INDEX IF NOT EXISTS idx_races_date
+                ON races(race_date);
+            CREATE INDEX IF NOT EXISTS idx_races_jyo
+                ON races(jyo_cd);
+        """)
+        # Elo キャッシュテーブル
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS elo_cache (
+                senshu_name TEXT NOT NULL,
+                as_of_date  TEXT NOT NULL,
+                elo_rating  REAL NOT NULL,
+                PRIMARY KEY (senshu_name, as_of_date)
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except sqlite3.Error:
+        pass
+
+
+def _calc_venue_win_rate(senshu_name, jyo_cd, race_date, db_path):
+    """
+    I-01: 当該選手が当該会場で race_date より前に
+    出走したレースの1着率。5件未満は全体平均 0.15 で補完。
+    """
+    if not senshu_name or not jyo_cd or not race_date:
+        return 0.15
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*),
+                   SUM(CASE WHEN r.rank = 1 THEN 1 ELSE 0 END)
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.senshu_name = ?
+              AND rc.jyo_cd = ?
+              AND rc.race_date < ?
+        """, (senshu_name, int(jyo_cd), str(race_date)))
+        row = cur.fetchone()
+        conn.close()
+        if row is None or row[0] is None or row[0] < 5:
+            return 0.15
+        total, wins = row[0], row[1] or 0
+        return round(wins / total, 4)
+    except (sqlite3.Error, Exception):
+        return 0.15
+
+
+def _calc_trend_score(senshu_name, race_date, db_path):
+    """
+    I-02: 直近3ヶ月の勝率 - 直近1年の勝率。
+    各期間5件未満は 0 で補完。
+    """
+    if not senshu_name or not race_date:
+        return 0.0
+    try:
+        race_date_str = str(race_date)
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        cur = conn.cursor()
+
+        def _win_rate_in_period(days_back):
+            """race_date から days_back 日前までの1着率"""
+            # YYYYMMDD → 日付計算は文字列比較で代用
+            # 90日前 / 365日前を概算
+            try:
+                from datetime import datetime, timedelta
+                dt = datetime.strptime(race_date_str[:8], "%Y%m%d")
+                cutoff = (dt - timedelta(days=days_back)).strftime("%Y%m%d")
+            except ValueError:
+                return None, 0
+            cur.execute("""
+                SELECT COUNT(*),
+                       SUM(CASE WHEN r.rank = 1 THEN 1 ELSE 0 END)
+                FROM results r
+                JOIN races rc ON r.race_id = rc.race_id
+                WHERE r.senshu_name = ?
+                  AND rc.race_date >= ?
+                  AND rc.race_date < ?
+            """, (senshu_name, cutoff, race_date_str))
+            row = cur.fetchone()
+            if row is None or row[0] is None or row[0] < 5:
+                return None, 0
+            return row[1] / row[0], row[0]
+
+        rate_3m, n_3m = _win_rate_in_period(90)
+        rate_1y, n_1y = _win_rate_in_period(365)
+        conn.close()
+
+        if rate_3m is None or rate_1y is None:
+            return 0.0
+        return round(rate_3m - rate_1y, 4)
+    except (sqlite3.Error, Exception):
+        return 0.0
+
+
+def _calc_h2h_win_rate(senshu_name, opponents, race_date, db_path):
+    """
+    I-03: 同レースの対戦相手全員との過去直接対戦勝率の平均。
+    同一レースで同時出走し、自分が上位だった率。
+    対戦数10件未満は 0.5 で補完。
+    """
+    if not senshu_name or not opponents or not race_date:
+        return 0.5
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        cur = conn.cursor()
+        race_date_str = str(race_date)
+
+        total_matches = 0
+        total_wins = 0
+
+        for opp in opponents:
+            if not opp:
+                continue
+            # 両者が同一レースに出走したケースを検索
+            cur.execute("""
+                SELECT r1.rank, r2.rank
+                FROM results r1
+                JOIN results r2 ON r1.race_id = r2.race_id
+                JOIN races rc ON r1.race_id = rc.race_id
+                WHERE r1.senshu_name = ?
+                  AND r2.senshu_name = ?
+                  AND rc.race_date < ?
+            """, (senshu_name, opp, race_date_str))
+            rows = cur.fetchall()
+            for my_rank, opp_rank in rows:
+                if my_rank is not None and opp_rank is not None:
+                    total_matches += 1
+                    if my_rank < opp_rank:
+                        total_wins += 1
+
+        conn.close()
+        if total_matches < 10:
+            return 0.5
+        return round(total_wins / total_matches, 4)
+    except (sqlite3.Error, Exception):
+        return 0.5
+
+
+def _load_or_compute_elo(db_path, df, name_col, date_col):
+    """
+    I-04: 拡張Eloレーティング。
+
+    計算方法:
+      初期値 1500、K=32
+      1着は全敗者に勝利、2着は1着以外の敗者に勝利、...
+      当該レースの結果は含めない（race_date < 当該日付を厳守）
+
+    キャッシュ:
+      elo_cache テーブルに (senshu_name, as_of_date) → elo_rating を保存
+      キャッシュが十分あればそこから読む
+
+    Returns:
+        dict: {(senshu_name, race_date): elo_rating}
+    """
+    # df に含まれる (senshu_name, race_date) ペアを収集
+    needed = set()
+    for _, row in df.iterrows():
+        sn = row.get(name_col)
+        rd = row.get(date_col)
+        if sn and rd:
+            needed.add((str(sn), str(rd)))
+
+    if not needed:
+        return {}
+
+    # キャッシュから読み込みを試行
+    result = {}
+    uncached = set()
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        cur = conn.cursor()
+        # elo_cache テーブルの存在確認
+        cur.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='elo_cache'"
+        )
+        has_cache = cur.fetchone() is not None
+
+        if has_cache:
+            for sn, rd in needed:
+                cur.execute(
+                    "SELECT elo_rating FROM elo_cache "
+                    "WHERE senshu_name = ? AND as_of_date = ?",
+                    (sn, rd)
+                )
+                row = cur.fetchone()
+                if row is not None:
+                    result[(sn, rd)] = row[0]
+                else:
+                    uncached.add((sn, rd))
+        else:
+            uncached = needed
+
+        conn.close()
+    except sqlite3.Error:
+        uncached = needed
+
+    # キャッシュで全件見つかった場合
+    if not uncached:
+        return result
+
+    # Elo を一括計算（全レースを時系列順に走査）
+    try:
+        elo_scores = _compute_elo_full(db_path)
+    except Exception:
+        # 計算失敗時はデフォルト値
+        for key in uncached:
+            result[key] = 1500.0
+        return result
+
+    # uncached 分を埋める
+    for sn, rd in uncached:
+        result[(sn, rd)] = elo_scores.get(sn, {}).get(rd, 1500.0)
+
+    # キャッシュに書き込み
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        for (sn, rd), elo in result.items():
+            try:
+                conn.execute(
+                    "INSERT OR IGNORE INTO elo_cache "
+                    "(senshu_name, as_of_date, elo_rating) VALUES (?, ?, ?)",
+                    (sn, rd, elo)
+                )
+            except sqlite3.Error:
+                pass
+        conn.commit()
+        conn.close()
+    except sqlite3.Error:
+        pass
+
+    return result
+
+
+def _compute_elo_full(db_path):
+    """
+    全レースを時系列順に走査して Elo レーティングを計算する。
+    メモリ上で一括処理し、SQLクエリを最小化する。
+
+    Returns:
+        dict: {senshu_name: {race_date: elo_before_that_date}}
+        → 各選手が各日付時点で持っていた Elo 値
+    """
+    K = 32.0
+    INITIAL = 1500.0
+
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    conn.execute("PRAGMA query_only = ON;")
+
+    # 全レース結果をメモリに読み込む（時系列順）
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT r.race_id, rc.race_date, r.senshu_name, r.rank
+        FROM results r
+        JOIN races rc ON r.race_id = rc.race_id
+        WHERE r.senshu_name IS NOT NULL AND r.rank IS NOT NULL
+        ORDER BY rc.race_date, r.race_id, r.rank
+    """)
+    all_results = cur.fetchall()
+    conn.close()
+
+    if not all_results:
+        return {}
+
+    # 現在の Elo 値（最新状態）
+    current_elo = {}  # senshu_name → float
+
+    # 各日付時点での Elo スナップショット
+    # senshu_name → {race_date: elo_before}
+    elo_history = {}
+
+    # レースごとにグループ化
+    from itertools import groupby
+    from operator import itemgetter
+
+    for race_id, race_group in groupby(all_results, key=itemgetter(0)):
+        race_rows = list(race_group)
+        if not race_rows:
+            continue
+
+        race_date = race_rows[0][1]
+
+        # このレースの出走者と着順
+        participants = []  # [(senshu_name, rank)]
+        for _, _, sname, rank in race_rows:
+            if sname:
+                participants.append((sname, rank))
+
+        # Elo スナップショットを記録（レース前の値）
+        for sname, _ in participants:
+            if sname not in current_elo:
+                current_elo[sname] = INITIAL
+            if sname not in elo_history:
+                elo_history[sname] = {}
+            # このレース「前」の Elo を記録
+            elo_history[sname][race_date] = current_elo[sname]
+
+        # 拡張 Elo 更新（各順位ペアで勝敗を計算）
+        n = len(participants)
+        if n < 2:
+            continue
+
+        elo_deltas = {sname: 0.0 for sname, _ in participants}
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                name_i, rank_i = participants[i]
+                name_j, rank_j = participants[j]
+
+                elo_i = current_elo.get(name_i, INITIAL)
+                elo_j = current_elo.get(name_j, INITIAL)
+
+                # 期待勝率
+                exp_i = 1.0 / (1.0 + 10.0 ** ((elo_j - elo_i) / 400.0))
+
+                # 実際の結果（rank が小さいほど上位）
+                if rank_i < rank_j:
+                    actual_i = 1.0
+                elif rank_i > rank_j:
+                    actual_i = 0.0
+                else:
+                    actual_i = 0.5
+
+                # K 係数をペア数で割って調整
+                k_adj = K / max(n - 1, 1)
+                delta = k_adj * (actual_i - exp_i)
+                elo_deltas[name_i] += delta
+                elo_deltas[name_j] -= delta
+
+        # Elo 更新
+        for sname, delta in elo_deltas.items():
+            current_elo[sname] = current_elo.get(sname, INITIAL) + delta
+
+    return elo_history
+
+
+# =============================================================
+# 特徴量名一覧（55特徴量）
 # =============================================================
 
 FEATURE_NAMES = [
@@ -945,6 +1404,9 @@ FEATURE_NAMES = [
     # H: レース内相対（4）
     "H01_grade_score_rank", "H02_back_count_rank",
     "H03_grade_score_vs_field", "H04_is_home",
+    # I: 履歴（4）← 新規
+    "I01_home_venue_win_rate", "I02_recent_trend_score",
+    "I03_h2h_win_rate", "I04_elo_rating",
 ]
 
-assert len(FEATURE_NAMES) == 51, f"特徴量数が{len(FEATURE_NAMES)}です（51であるべき）"
+assert len(FEATURE_NAMES) == 55, f"特徴量数が{len(FEATURE_NAMES)}です（55であるべき）"
