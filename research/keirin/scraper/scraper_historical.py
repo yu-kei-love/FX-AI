@@ -1386,18 +1386,71 @@ class KdreamsSupplementScraper:
             end_dt.strftime("%Y%m%d"),
         )
 
-    def _supplement_missing_dates_between(self, start_compact, end_compact):
+    def _supplement_missing_dates_between(self, start_compact, end_compact,
+                                          max_retries=3, retry_delay=120):
         """
         未補完日付リストを取得して順次補完する内部実装。
+        1巡目の完了後、まだ未補完が残っていれば自動リトライする。
 
         Parameters:
             start_compact: "YYYYMMDD" 形式 or None
             end_compact:   "YYYYMMDD" 形式 or None
             （None の場合は全期間）
+            max_retries: 自動リトライ回数（デフォルト3回）
+            retry_delay: リトライ間の待機秒数（デフォルト120秒、毎回2倍に増加）
         """
+        for attempt in range(1 + max_retries):
+            dates = self._get_null_dates(start_compact, end_compact)
+
+            if not dates:
+                if attempt == 0:
+                    logger.info("補完対象の日付なし")
+                else:
+                    logger.info("リトライ %d: 未補完なし → 完了", attempt)
+                return
+
+            # リトライ回の場合はログと待機
+            if attempt > 0:
+                wait = retry_delay * (2 ** (attempt - 1))
+                logger.info(
+                    "=== リトライ %d/%d: %d日分が未補完 → %d秒待機後に再試行 ===",
+                    attempt, max_retries, len(dates), wait,
+                )
+                time.sleep(wait)
+
+            range_label = ""
+            if start_compact or end_compact:
+                range_label = (
+                    f" (range {start_compact or '-'}〜{end_compact or '-'})"
+                )
+            label = f"[pass {attempt + 1}] " if attempt > 0 else ""
+            logger.info("%s補完対象日数: %d%s", label, len(dates), range_label)
+
+            for i, date_compact in enumerate(dates, 1):
+                try:
+                    dt = datetime.strptime(date_compact, "%Y%m%d")
+                except ValueError:
+                    continue
+                date_str = dt.strftime("%Y-%m-%d")
+                logger.info("[%d/%d] %s の補完", i, len(dates), date_str)
+                try:
+                    self.supplement_entries_for_date(date_str)
+                except Exception as e:
+                    logger.error("[%s] 補完エラー: %s", date_str, e)
+                    self._log_failed(f"supplement_{date_str}", str(e))
+
+        # 最終チェック
+        remaining = self._get_null_dates(start_compact, end_compact)
+        if remaining:
+            logger.warning(
+                "リトライ %d回後も %d日分が未補完のまま残っています",
+                max_retries, len(remaining),
+            )
+
+    def _get_null_dates(self, start_compact, end_compact):
+        """指定範囲内の kyoso_tokuten IS NULL の日付一覧を返す"""
         conn = self._connect_db()
         cur = conn.cursor()
-
         sql = """
             SELECT DISTINCT r.race_date
             FROM entries e
@@ -1412,32 +1465,10 @@ class KdreamsSupplementScraper:
             sql += " AND r.race_date <= ?"
             params.append(end_compact)
         sql += " ORDER BY r.race_date"
-
         cur.execute(sql, params)
         dates = [row[0] for row in cur.fetchall()]
         conn.close()
-
-        if not dates:
-            logger.info("補完対象の日付なし")
-            return
-
-        range_label = ""
-        if start_compact or end_compact:
-            range_label = f" (range {start_compact or '-'}〜{end_compact or '-'})"
-        logger.info("補完対象日数: %d%s", len(dates), range_label)
-
-        for i, date_compact in enumerate(dates, 1):
-            try:
-                dt = datetime.strptime(date_compact, "%Y%m%d")
-            except ValueError:
-                continue
-            date_str = dt.strftime("%Y-%m-%d")
-            logger.info("[%d/%d] %s の補完", i, len(dates), date_str)
-            try:
-                self.supplement_entries_for_date(date_str)
-            except Exception as e:
-                logger.error("[%s] 補完エラー: %s", date_str, e)
-                self._log_failed(f"supplement_{date_str}", str(e))
+        return dates
 
 
 # =========================================================
