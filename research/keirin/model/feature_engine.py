@@ -3,7 +3,7 @@
 # 競輪AI - 特徴量エンジン（52特徴量）
 #
 # カテゴリ構成：
-#   A: 選手個人（13）
+#   A: 選手個人（12）  ← home_count除外（全件NULL・Kドリームズ非掲載）
 #   B: ライン（8）  ← 最重要
 #   C: バンク×脚質（7）
 #   D: 展開予測（4）← 既存AIにない特徴
@@ -11,7 +11,7 @@
 #   F: オッズ（6）
 #   G: レース構成（5）
 #   H: レース内相対（4）
-#   合計：52特徴量
+#   合計：51特徴量
 #
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
@@ -165,11 +165,15 @@ def calc_racer_features(df: pd.DataFrame,
     A-06 style_num（脚質 逃げ=2/追込=1/両=0）
     A-07 gear_ratio（ギア倍数）← 競輪固有・重要
     A-08 back_count（B：バック回数）← 最重要特徴量
-    A-09 home_count（H：ホーム回数）
-    A-10 start_count（S：スタート回数）
-    A-11 age（年齢）
-    A-12 term（期別）
-    A-13 bante_makuri_rate（番手捲り率）← 新規追加
+    A-09 start_count（S：スタート回数）
+    A-10 age（年齢）
+    A-11 term（期別）
+    A-12 bante_makuri_rate（番手捲り率）
+
+    除外:
+    home_count（H：ホーム回数）→ Kドリームズ非掲載のため全件NULL
+    NULLが100%の特徴量は情報を持たないので除外する
+    将来KEIRIN.JP等から補完できたら再度追加する
     """
     CLASS_MAP = {"SS": 5, "S1": 4, "S2": 3, "A1": 2, "A2": 1, "A3": 0}
 
@@ -182,13 +186,13 @@ def calc_racer_features(df: pd.DataFrame,
     out["A06_style_num"]    = df["style"].map(STYLE_MAP).fillna(0).astype(int)
     out["A07_gear_ratio"]   = df["gear_ratio"].fillna(3.6)   # 未検証：平均値3.6を仮置き
     out["A08_back_count"]   = df["back_count"].fillna(0).astype(int)   # 最重要
-    out["A09_home_count"]   = df["home_count"].fillna(0).astype(int)
-    out["A10_start_count"]  = df["start_count"].fillna(0).astype(int)
-    out["A11_age"]          = df["age"].fillna(30).astype(int)
-    out["A12_term"]         = df["term"].fillna(80).astype(int)
+    # home_count は除外（Kドリームズ非掲載で全件NULL）
+    out["A09_start_count"]  = df["start_count"].fillna(0).astype(int)
+    out["A10_age"]          = df["age"].fillna(30).astype(int)
+    out["A11_term"]         = df["term"].fillna(80).astype(int)
 
-    # A-13: 番手捲り率（line_pos=2 のレースで rank=1 の割合）
-    out["A13_bante_makuri_rate"] = df.apply(
+    # A-12: 番手捲り率（line_pos=2 のレースで rank=1 の割合）
+    out["A12_bante_makuri_rate"] = df.apply(
         lambda row: _calc_bante_makuri_rate(
             row.get("racer_id"), db_path
         ), axis=1
@@ -908,16 +912,16 @@ def calc_relative_features(df: pd.DataFrame,
 
 
 # =============================================================
-# 特徴量名一覧（52特徴量）
+# 特徴量名一覧（51特徴量）
 # =============================================================
 
 FEATURE_NAMES = [
-    # A: 選手個人（13）
+    # A: 選手個人（12）← home_count除外
     "A01_racer_class", "A02_grade_score", "A03_win_rate",
     "A04_second_rate", "A05_third_rate", "A06_style_num",
-    "A07_gear_ratio", "A08_back_count", "A09_home_count",
-    "A10_start_count", "A11_age", "A12_term",
-    "A13_bante_makuri_rate",
+    "A07_gear_ratio", "A08_back_count",
+    "A09_start_count", "A10_age", "A11_term",
+    "A12_bante_makuri_rate",
     # B: ライン（8）← 最重要
     "B01_line_position_num", "B02_line_size", "B03_line_confidence",
     "B04_line_grade_score", "B05_line_back_sum", "B06_betrayal_risk",
@@ -943,4 +947,4 @@ FEATURE_NAMES = [
     "H03_grade_score_vs_field", "H04_is_home",
 ]
 
-assert len(FEATURE_NAMES) == 52, f"特徴量数が{len(FEATURE_NAMES)}です（52であるべき）"
+assert len(FEATURE_NAMES) == 51, f"特徴量数が{len(FEATURE_NAMES)}です（51であるべき）"
