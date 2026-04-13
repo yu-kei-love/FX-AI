@@ -144,6 +144,8 @@ class ChariLotoScraper:
                 kimari_te   TEXT,
                 line_id     INTEGER,
                 line_pos    INTEGER,
+                agari_time  REAL,
+                chakusa     TEXT,
                 created_at  TEXT NOT NULL,
                 PRIMARY KEY (race_id, rank),
                 FOREIGN KEY (race_id) REFERENCES races(race_id)
@@ -172,15 +174,25 @@ class ChariLotoScraper:
             CREATE INDEX IF NOT EXISTS idx_entries_race ON entries(race_id);
         """)
 
-        # 既存DBにstart_countがなければ追加（マイグレーション）
+        # 既存DBにカラムがなければ追加（マイグレーション）
         cur.execute("PRAGMA table_info(entries)")
-        existing_cols = {row[1] for row in cur.fetchall()}
-        if "start_count" not in existing_cols:
+        entry_cols = {row[1] for row in cur.fetchall()}
+        if "start_count" not in entry_cols:
             try:
                 cur.execute("ALTER TABLE entries ADD COLUMN start_count INTEGER")
                 logger.info("entries テーブルに start_count カラムを追加")
             except sqlite3.OperationalError as e:
                 logger.warning("start_count 追加失敗: %s", e)
+
+        cur.execute("PRAGMA table_info(results)")
+        result_cols = {row[1] for row in cur.fetchall()}
+        for col, typ in [("agari_time", "REAL"), ("chakusa", "TEXT")]:
+            if col not in result_cols:
+                try:
+                    cur.execute(f"ALTER TABLE results ADD COLUMN {col} {typ}")
+                    logger.info("results テーブルに %s カラムを追加", col)
+                except sqlite3.OperationalError as e:
+                    logger.warning("%s 追加失敗: %s", col, e)
 
         conn.commit()
         conn.close()
@@ -371,6 +383,8 @@ class ChariLotoScraper:
                         "kimari_te": row.get("kimari_te"),
                         "line_id": line_id,
                         "line_pos": line_pos,
+                        "agari_time": row.get("agari_time"),
+                        "chakusa": row.get("chakusa"),
                     })
 
                 # 全選手 entries テーブルへ
@@ -431,6 +445,8 @@ class ChariLotoScraper:
             pref_col = self._find_col(cols, ["府県", "都道府県"])
             ki_col = self._find_col(cols, ["期別"])
             kimari_col = self._find_col(cols, ["決まり手", "決り手"])
+            agari_col = self._find_col(cols, ["上り", "上がり"])
+            chakusa_col = self._find_col(cols, ["着差"])
 
             rows = []
             for _, row in df.iterrows():
@@ -449,6 +465,10 @@ class ChariLotoScraper:
                                 if ki_col else None,
                     "kimari_te": self._clean_str(row.get(kimari_col))
                                  if kimari_col else None,
+                    "agari_time": self._to_float(row.get(agari_col))
+                                  if agari_col else None,
+                    "chakusa": self._clean_str(row.get(chakusa_col))
+                               if chakusa_col else None,
                 })
 
             if rows:
@@ -592,8 +612,8 @@ class ChariLotoScraper:
                 cur.execute("""
                     INSERT OR IGNORE INTO results
                     (race_id, rank, sha_ban, senshu_name, kimari_te,
-                     line_id, line_pos, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     line_id, line_pos, agari_time, chakusa, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     r["race_id"],
                     r["rank"],
@@ -602,6 +622,8 @@ class ChariLotoScraper:
                     r.get("kimari_te"),
                     r.get("line_id"),
                     r.get("line_pos"),
+                    r.get("agari_time"),
+                    r.get("chakusa"),
                     now,
                 ))
             except sqlite3.Error as e:
@@ -1471,6 +1493,111 @@ class KdreamsSupplementScraper:
         return dates
 
 
+    # =========================================================
+    # 上がりタイム・着差のバックフィル
+    # =========================================================
+
+    def backfill_agari(self, start_date, end_date):
+        """
+        agari_time が NULL の race_id を再取得して
+        agari_time と chakusa を埋める。
+
+        既存の race_id を chariloto から再取得し、
+        results テーブルを UPDATE する。
+        """
+        start_dt = self._parse_date(start_date)
+        end_dt = self._parse_date(end_date)
+        if start_dt is None or end_dt is None:
+            logger.error("日付パース失敗: %s, %s", start_date, end_date)
+            return
+
+        conn = self._connect_db()
+        cur = conn.cursor()
+
+        # agari_time が NULL のレース日付+会場を取得
+        cur.execute("""
+            SELECT DISTINCT rc.race_date, rc.jyo_cd
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.agari_time IS NULL
+              AND rc.race_date >= ?
+              AND rc.race_date <= ?
+            ORDER BY rc.race_date
+        """, (start_dt.strftime("%Y%m%d"), end_dt.strftime("%Y%m%d")))
+        targets = cur.fetchall()
+        conn.close()
+
+        if not targets:
+            logger.info("backfill_agari: 対象なし")
+            return
+
+        logger.info("backfill_agari: %d 会場日を処理", len(targets))
+
+        # venue_id → jka_code マップ
+        vid_to_jka = {}
+        for info in BANK_MASTER.values():
+            vid = info.get("venue_id")
+            jka = info.get("jka_code")
+            if vid and jka:
+                vid_to_jka[int(vid)] = jka
+
+        updated_total = 0
+        for i, (race_date, jyo_cd) in enumerate(targets, 1):
+            jka = vid_to_jka.get(int(jyo_cd))
+            if jka is None:
+                continue
+
+            try:
+                dt = datetime.strptime(race_date, "%Y%m%d")
+            except ValueError:
+                continue
+            date_str = dt.strftime("%Y-%m-%d")
+
+            logger.info("[%d/%d] %s jyo=%s → jka=%s",
+                        i, len(targets), date_str, jyo_cd, jka)
+
+            try:
+                parsed_races = self.scrape_race_result(jka, date_str)
+            except Exception as e:
+                logger.error("取得失敗 %s/%s: %s", jka, date_str, e)
+                self._polite_sleep()
+                continue
+
+            if not parsed_races:
+                self._polite_sleep()
+                continue
+
+            # UPDATE（agari_time / chakusa のみ）
+            conn = self._connect_db()
+            cur = conn.cursor()
+            n_updated = 0
+            for pr in parsed_races:
+                for r in pr["results"]:
+                    if r.get("agari_time") is not None:
+                        cur.execute("""
+                            UPDATE results
+                            SET agari_time = ?, chakusa = ?
+                            WHERE race_id = ? AND rank = ?
+                              AND agari_time IS NULL
+                        """, (
+                            r["agari_time"],
+                            r.get("chakusa"),
+                            r["race_id"],
+                            r["rank"],
+                        ))
+                        n_updated += cur.rowcount
+            conn.commit()
+            conn.close()
+
+            if n_updated > 0:
+                updated_total += n_updated
+                logger.info("  → %d 件更新", n_updated)
+
+            self._polite_sleep()
+
+        logger.info("backfill_agari 完了: %d 件更新", updated_total)
+
+
 # =========================================================
 # コマンドラインインターフェース
 # =========================================================
@@ -1499,6 +1626,8 @@ def main():
     parser.add_argument("--supplement_range", type=str, default=None,
                         help="Kドリームズ補完を指定期間の未補完分に実行"
                              "（例: 2022-04-20,2023-08-26）")
+    parser.add_argument("--backfill_agari", action="store_true",
+                        help="agari_timeがNULLのレースの上がりタイムを再取得")
 
     args = parser.parse_args()
 
@@ -1512,6 +1641,15 @@ def main():
         except ValueError as e:
             logger.error("--jyo_cds の形式が不正: %s", e)
             return
+
+    # 上がりタイムバックフィル
+    if args.backfill_agari:
+        if not args.start or not args.end:
+            logger.error("--backfill_agari には --start と --end が必要")
+            return
+        scraper = ChariLotoScraper(db_path=args.db, delay=args.delay)
+        scraper.backfill_agari(args.start, args.end)
+        return
 
     # Kドリームズ補完モード
     if args.supplement or args.supplement_all or args.supplement_range:

@@ -1,6 +1,6 @@
 # ===========================================
 # model/feature_engine.py
-# 競輪AI - 特徴量エンジン（55特徴量）
+# 競輪AI - 特徴量エンジン（57特徴量）
 #
 # カテゴリ構成：
 #   A: 選手個人（12）  ← home_count除外（全件NULL・Kドリームズ非掲載）
@@ -11,8 +11,8 @@
 #   F: オッズ（6）
 #   G: レース構成（5）
 #   H: レース内相対（4）
-#   I: 履歴（4）← 当場勝率・トレンド・相性・Elo
-#   合計：55特徴量
+#   I: 履歴（6）← 当場勝率・トレンド・相性・Elo・上がりタイム
+#   合計：57特徴量
 #
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
@@ -98,7 +98,7 @@ def create_features(entries_df, races_df, odds_df,
                     line_probs=None, bank_info=None,
                     db_path=None):
     """
-    全55特徴量を計算して返す。
+    全57特徴量を計算して返す。
 
     Parameters:
         entries_df : 出走情報DataFrame
@@ -937,6 +937,8 @@ def calc_history_features(df: pd.DataFrame,
         out["I02_recent_trend_score"]  = 0.0
         out["I03_h2h_win_rate"]        = 0.5
         out["I04_elo_rating"]          = 1500.0
+        out["I05_recent_agari_avg"]    = 11.5  # 全体平均（未検証）
+        out["I06_agari_trend"]         = 0.0
         return out
 
     db = Path(db_path)
@@ -957,6 +959,8 @@ def calc_history_features(df: pd.DataFrame,
         out["I02_recent_trend_score"]  = 0.0
         out["I03_h2h_win_rate"]        = 0.5
         out["I04_elo_rating"]          = 1500.0
+        out["I05_recent_agari_avg"]    = 11.5
+        out["I06_agari_trend"]         = 0.0
         return out
 
     # race_date 列の確保（マージ済みなら date か race_date がある）
@@ -1015,6 +1019,20 @@ def calc_history_features(df: pd.DataFrame,
         lambda row: elo_map.get(
             (str(row.get(name_col, "")), str(row.get(date_col, ""))),
             1500.0
+        ), axis=1
+    )
+
+    # I-05: 直近上がりタイム平均（直近10レース）
+    out["I05_recent_agari_avg"] = df.apply(
+        lambda row: _calc_recent_agari_avg(
+            row.get(name_col), row.get(date_col), db
+        ), axis=1
+    )
+
+    # I-06: 上がりタイムトレンド（直近3R平均 - 直近10R平均）
+    out["I06_agari_trend"] = df.apply(
+        lambda row: _calc_agari_trend(
+            row.get(name_col), row.get(date_col), db
         ), axis=1
     )
 
@@ -1371,7 +1389,70 @@ def _compute_elo_full(db_path):
 
 
 # =============================================================
-# 特徴量名一覧（55特徴量）
+def _calc_recent_agari_avg(senshu_name, race_date, db_path, n=10):
+    """
+    I-05: 直近 n レースの上がりタイム平均。
+    3件未満は全選手平均 11.5 で補完。
+    race_date < 当該レースの日付 で厳密にリーク防止。
+    """
+    if not senshu_name or not race_date:
+        return 11.5
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT r.agari_time
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.senshu_name = ?
+              AND rc.race_date < ?
+              AND r.agari_time IS NOT NULL
+            ORDER BY rc.race_date DESC
+            LIMIT ?
+        """, (senshu_name, str(race_date), n))
+        vals = [row[0] for row in cur.fetchall()]
+        conn.close()
+        if len(vals) < 3:
+            return 11.5
+        return round(sum(vals) / len(vals), 3)
+    except (sqlite3.Error, Exception):
+        return 11.5
+
+
+def _calc_agari_trend(senshu_name, race_date, db_path):
+    """
+    I-06: 直近3レースの上がりタイム平均 - 直近10レースの上がりタイム平均。
+    マイナス（タイムが縮んでいる）→ 好調。
+    データ不足時は 0 で補完。
+    race_date < 当該レースの日付 で厳密にリーク防止。
+    """
+    if not senshu_name or not race_date:
+        return 0.0
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT r.agari_time
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.senshu_name = ?
+              AND rc.race_date < ?
+              AND r.agari_time IS NOT NULL
+            ORDER BY rc.race_date DESC
+            LIMIT 10
+        """, (senshu_name, str(race_date)))
+        vals = [row[0] for row in cur.fetchall()]
+        conn.close()
+        if len(vals) < 3:
+            return 0.0
+        avg_3 = sum(vals[:3]) / 3
+        avg_10 = sum(vals) / len(vals)
+        return round(avg_3 - avg_10, 4)
+    except (sqlite3.Error, Exception):
+        return 0.0
+
+
+# 特徴量名一覧（57特徴量）
 # =============================================================
 
 FEATURE_NAMES = [
@@ -1404,9 +1485,10 @@ FEATURE_NAMES = [
     # H: レース内相対（4）
     "H01_grade_score_rank", "H02_back_count_rank",
     "H03_grade_score_vs_field", "H04_is_home",
-    # I: 履歴（4）← 新規
+    # I: 履歴（6）
     "I01_home_venue_win_rate", "I02_recent_trend_score",
     "I03_h2h_win_rate", "I04_elo_rating",
+    "I05_recent_agari_avg", "I06_agari_trend",
 ]
 
-assert len(FEATURE_NAMES) == 55, f"特徴量数が{len(FEATURE_NAMES)}です（55であるべき）"
+assert len(FEATURE_NAMES) == 57, f"特徴量数が{len(FEATURE_NAMES)}です（57であるべき）"
