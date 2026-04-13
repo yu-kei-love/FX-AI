@@ -1695,14 +1695,34 @@ class KdreamsSupplementScraper:
 
     def supplement_race_info_all(self):
         """DB全体の grade IS NULL のレースを日付別に一括補完する"""
+        self._supplement_race_info_dates(None, None)
+
+    def supplement_race_info_range(self, start_date, end_date):
+        """指定期間の grade IS NULL のレースを補完する（並列実行用）"""
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        self._supplement_race_info_dates(
+            start_dt.strftime("%Y%m%d"),
+            end_dt.strftime("%Y%m%d"),
+        )
+
+    def _supplement_race_info_dates(self, start_compact, end_compact):
+        """grade IS NULL の日付リストを取得して順次補完する内部実装"""
         conn = self._connect_db()
         cur = conn.cursor()
-        cur.execute("""
+        sql = """
             SELECT DISTINCT race_date
-            FROM races
-            WHERE grade IS NULL
-            ORDER BY race_date
-        """)
+            FROM races WHERE grade IS NULL
+        """
+        params = []
+        if start_compact is not None:
+            sql += " AND race_date >= ?"
+            params.append(start_compact)
+        if end_compact is not None:
+            sql += " AND race_date <= ?"
+            params.append(end_compact)
+        sql += " ORDER BY race_date"
+        cur.execute(sql, params)
         dates = [row[0] for row in cur.fetchall()]
         conn.close()
 
@@ -1710,7 +1730,11 @@ class KdreamsSupplementScraper:
             logger.info("race_info 補完対象なし")
             return
 
-        logger.info("race_info 補完対象日数: %d", len(dates))
+        range_label = ""
+        if start_compact or end_compact:
+            range_label = f" (range {start_compact or '-'}〜{end_compact or '-'})"
+        logger.info("race_info 補完対象日数: %d%s", len(dates), range_label)
+
         for i, date_compact in enumerate(dates, 1):
             try:
                 dt = datetime.strptime(date_compact, "%Y%m%d")
@@ -1865,6 +1889,9 @@ def main():
                              "（YYYY-MM-DD）")
     parser.add_argument("--race_info_all", action="store_true",
                         help="grade/stage/is_midnightを全件補完")
+    parser.add_argument("--race_info_range", type=str, default=None,
+                        help="grade/stageを指定期間の未補完分に補完"
+                             "（例: 2022-01-01,2022-12-31）")
 
     args = parser.parse_args()
 
@@ -1880,7 +1907,7 @@ def main():
             return
 
     # race_info 補完
-    if args.race_info or args.race_info_all:
+    if args.race_info or args.race_info_all or args.race_info_range:
         try:
             supp = KdreamsSupplementScraper(
                 db_path=args.db, delay=args.delay,
@@ -1890,6 +1917,12 @@ def main():
             return
         if args.race_info_all:
             supp.supplement_race_info_all()
+        elif args.race_info_range:
+            parts = args.race_info_range.split(",")
+            if len(parts) != 2:
+                logger.error("--race_info_range は 'START,END' 形式で指定")
+                return
+            supp.supplement_race_info_range(parts[0].strip(), parts[1].strip())
         else:
             supp.supplement_race_info(args.race_info)
         return
