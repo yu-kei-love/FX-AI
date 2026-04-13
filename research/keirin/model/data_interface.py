@@ -83,9 +83,13 @@ class DataInterface:
     # =============================================================
 
     def get_races(self, start_date: str = None,
-                  end_date: str = None) -> pd.DataFrame:
+                  end_date: str = None,
+                  is_midnight_filter: bool = None) -> pd.DataFrame:
         """
         レース情報を取得する。
+
+        Parameters:
+            is_midnight_filter: True→ミッドナイトのみ、False→通常のみ、None→全件
 
         Returns:
             DataFrame columns:
@@ -93,10 +97,11 @@ class DataInterface:
             grade, race_type,
             wind_speed, wind_direction_sin, wind_direction_cos,
             is_rain, weather,
-            is_dome
+            is_dome, is_midnight
         """
         if self.mode == "sqlite":
-            return self._sqlite_races(start_date, end_date)
+            return self._sqlite_races(start_date, end_date,
+                                      is_midnight_filter=is_midnight_filter)
         elif self.mode == "csv":
             return self._csv_races(start_date, end_date)
         else:
@@ -220,11 +225,20 @@ class DataInterface:
         where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         return where_sql, params
 
-    def _sqlite_races(self, start_date, end_date):
+    def _sqlite_races(self, start_date, end_date, is_midnight_filter=None):
         where_sql, params = self._sqlite_where(start_date, end_date)
+        # is_midnight フィルタ
+        if is_midnight_filter is not None:
+            midnight_val = 1 if is_midnight_filter else 0
+            if where_sql:
+                where_sql += f" AND r.is_midnight = ?"
+            else:
+                where_sql = "WHERE r.is_midnight = ?"
+            params.append(midnight_val)
         conn = sqlite3.connect(self.db_path)
+        # race_date カラム対応（旧DB: date、新DB: race_date）
         df = pd.read_sql_query(
-            f"SELECT * FROM races r {where_sql} ORDER BY r.date, r.venue_id, r.race_no",
+            f"SELECT * FROM races r {where_sql} ORDER BY r.race_date, r.jyo_cd, r.race_no",
             conn, params=params,
         )
         conn.close()

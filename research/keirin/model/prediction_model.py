@@ -113,6 +113,20 @@ class Stage1Model:
         ])
         return self.meta_lr.predict_proba(meta_X)[:, 1]
 
+    def get_feature_importance(self):
+        """
+        LightGBMの特徴量重要度を返す。
+
+        Returns:
+            list[(str, float)]: [(特徴量名, スコア), ...] 降順ソート済み
+        """
+        if not self.is_fitted:
+            raise RuntimeError("モデルが学習されていません")
+        importance = self.lgb_model.feature_importances_
+        pairs = list(zip(FEATURE_NAMES, importance))
+        pairs.sort(key=lambda x: x[1], reverse=True)
+        return pairs
+
 
 # =============================================================
 # Stage2：条件付き2着確率
