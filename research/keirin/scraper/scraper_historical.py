@@ -1118,6 +1118,19 @@ class KdreamsSupplementScraper:
         tokuten_col = self._find_col(cols, ["競走得点"])
         s_col = self._find_col_exact(cols, ["S"])
         b_col = self._find_col_exact(cols, ["B"])
+        # v0.23 追加
+        class_col = self._find_col(cols, ["級班"])
+        winrate_col = self._find_col(cols, ["勝率"])
+        rate2_col = self._find_col(cols, ["2連対率"])
+        rate3_col = self._find_col(cols, ["3連対率"])
+        nige_col = self._find_col_exact(cols, ["逃"])
+        makuri_col = self._find_col_exact(cols, ["捲"])
+        sashi_col = self._find_col_exact(cols, ["差"])
+        mark_col = self._find_col_exact(cols, ["マ"])
+        first_col = self._find_col(cols, ["1着"])
+        second_col = self._find_col(cols, ["2着"])
+        third_col = self._find_col(cols, ["3着"])
+        out_col = self._find_col(cols, ["着外"])
 
         if sha_ban_col is None or tokuten_col is None:
             return {}
@@ -1133,7 +1146,6 @@ class KdreamsSupplementScraper:
             if name_col:
                 raw = str(row.get(name_col, "")).strip()
                 if raw and raw != "nan":
-                    # "  " (2スペース) または "\u3000" で分割
                     parts = re.split(r"\s{2,}|\u3000{2,}|  ", raw, maxsplit=1)
                     senshu_name = parts[0].strip() if parts else None
 
@@ -1146,6 +1158,31 @@ class KdreamsSupplementScraper:
                 "start_count": self._to_int(row.get(s_col)) if s_col else None,
                 "kyakushitsu": self._clean_str(row.get(kyakushitsu_col))
                                if kyakushitsu_col else None,
+                # v0.23 追加
+                "racer_class": self._clean_str(row.get(class_col))
+                               if class_col else None,
+                "win_rate": self._to_float(row.get(winrate_col))
+                            if winrate_col else None,
+                "second_rate": self._to_float(row.get(rate2_col))
+                              if rate2_col else None,
+                "third_rate": self._to_float(row.get(rate3_col))
+                             if rate3_col else None,
+                "nige_count": self._to_int(row.get(nige_col))
+                              if nige_col else None,
+                "makuri_count": self._to_int(row.get(makuri_col))
+                               if makuri_col else None,
+                "sashi_count": self._to_int(row.get(sashi_col))
+                              if sashi_col else None,
+                "mark_count": self._to_int(row.get(mark_col))
+                             if mark_col else None,
+                "first_count": self._to_int(row.get(first_col))
+                              if first_col else None,
+                "second_count": self._to_int(row.get(second_col))
+                               if second_col else None,
+                "third_count": self._to_int(row.get(third_col))
+                              if third_col else None,
+                "out_count": self._to_int(row.get(out_col))
+                            if out_col else None,
             }
 
         return result
@@ -1239,7 +1276,9 @@ class KdreamsSupplementScraper:
             SELECT e.race_id, e.sha_ban, e.senshu_name, r.jyo_cd
             FROM entries e
             JOIN races r ON e.race_id = r.race_id
-            WHERE r.race_date = ? AND e.kyoso_tokuten IS NULL
+            WHERE r.race_date = ?
+              AND (e.kyoso_tokuten IS NULL OR e.racer_class IS NULL
+                   OR e.win_rate IS NULL)
             ORDER BY e.race_id, e.sha_ban
         """, (date_compact,))
         missing = cur.fetchall()
@@ -1344,6 +1383,18 @@ class KdreamsSupplementScraper:
                     "back_count": stat.get("back_count"),
                     "start_count": stat.get("start_count"),
                     "kyakushitsu": stat.get("kyakushitsu"),
+                    "racer_class": stat.get("racer_class"),
+                    "win_rate": stat.get("win_rate"),
+                    "second_rate": stat.get("second_rate"),
+                    "third_rate": stat.get("third_rate"),
+                    "nige_count": stat.get("nige_count"),
+                    "makuri_count": stat.get("makuri_count"),
+                    "sashi_count": stat.get("sashi_count"),
+                    "mark_count": stat.get("mark_count"),
+                    "first_count": stat.get("first_count"),
+                    "second_count": stat.get("second_count"),
+                    "third_count": stat.get("third_count"),
+                    "out_count": stat.get("out_count"),
                 })
 
         # 一括 UPDATE（kyoso_tokuten が NULL のもののみ更新）
@@ -1358,7 +1409,8 @@ class KdreamsSupplementScraper:
     def _apply_updates(self, updates):
         """
         entries テーブルに一括更新をかける。
-        kyoso_tokuten が NULL のレコードのみ更新（上書き防止）。
+        COALESCE で既存値を保持（上書き防止）。
+        kyoso_tokuten IS NULL OR racer_class IS NULL のレコードを対象。
         """
         conn = self._connect_db()
         cur = conn.cursor()
@@ -1371,16 +1423,41 @@ class KdreamsSupplementScraper:
                         gear_ratio    = COALESCE(?, gear_ratio),
                         back_count    = COALESCE(?, back_count),
                         start_count   = COALESCE(?, start_count),
-                        kyakushitsu   = COALESCE(?, kyakushitsu)
+                        kyakushitsu   = COALESCE(?, kyakushitsu),
+                        racer_class   = COALESCE(?, racer_class),
+                        win_rate      = COALESCE(?, win_rate),
+                        second_rate   = COALESCE(?, second_rate),
+                        third_rate    = COALESCE(?, third_rate),
+                        nige_count    = COALESCE(?, nige_count),
+                        makuri_count  = COALESCE(?, makuri_count),
+                        sashi_count   = COALESCE(?, sashi_count),
+                        mark_count    = COALESCE(?, mark_count),
+                        first_count   = COALESCE(?, first_count),
+                        second_count  = COALESCE(?, second_count),
+                        third_count   = COALESCE(?, third_count),
+                        out_count     = COALESCE(?, out_count)
                     WHERE race_id = ?
                       AND sha_ban = ?
-                      AND kyoso_tokuten IS NULL
+                      AND (kyoso_tokuten IS NULL OR racer_class IS NULL
+                           OR win_rate IS NULL)
                 """, (
-                    u["kyoso_tokuten"],
-                    u["gear_ratio"],
-                    u["back_count"],
-                    u["start_count"],
-                    u["kyakushitsu"],
+                    u.get("kyoso_tokuten"),
+                    u.get("gear_ratio"),
+                    u.get("back_count"),
+                    u.get("start_count"),
+                    u.get("kyakushitsu"),
+                    u.get("racer_class"),
+                    u.get("win_rate"),
+                    u.get("second_rate"),
+                    u.get("third_rate"),
+                    u.get("nige_count"),
+                    u.get("makuri_count"),
+                    u.get("sashi_count"),
+                    u.get("mark_count"),
+                    u.get("first_count"),
+                    u.get("second_count"),
+                    u.get("third_count"),
+                    u.get("out_count"),
                     u["race_id"],
                     u["sha_ban"],
                 ))
@@ -1481,14 +1558,15 @@ class KdreamsSupplementScraper:
             )
 
     def _get_null_dates(self, start_compact, end_compact):
-        """指定範囲内の kyoso_tokuten IS NULL の日付一覧を返す"""
+        """指定範囲内の未補完 entries の日付一覧を返す"""
         conn = self._connect_db()
         cur = conn.cursor()
         sql = """
             SELECT DISTINCT r.race_date
             FROM entries e
             JOIN races r ON e.race_id = r.race_id
-            WHERE e.kyoso_tokuten IS NULL
+            WHERE (e.kyoso_tokuten IS NULL OR e.racer_class IS NULL
+                   OR e.win_rate IS NULL)
         """
         params = []
         if start_compact is not None:

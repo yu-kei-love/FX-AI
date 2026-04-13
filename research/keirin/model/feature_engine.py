@@ -12,7 +12,8 @@
 #   G: レース構成（6）← is_midnight追加
 #   H: レース内相対（4）
 #   I: 履歴（6）← 当場勝率・トレンド・相性・Elo・上がりタイム
-#   合計：58特徴量
+#   J: 決まり手実績（3）← 逃げ率・捲り率・差し率
+#   合計：61特徴量
 #
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
@@ -108,7 +109,7 @@ def create_features(entries_df, races_df, odds_df,
                     line_probs=None, bank_info=None,
                     db_path=None):
     """
-    全58特徴量を計算して返す。
+    全61特徴量を計算して返す。
 
     Parameters:
         entries_df : 出走情報DataFrame
@@ -149,9 +150,10 @@ def create_features(entries_df, races_df, odds_df,
     feat_g = calc_race_features(df, line_probs)
     feat_h = calc_relative_features(df, bank_info)
     feat_i = calc_history_features(df, db_path=db_path)
+    feat_j = calc_kimari_features(df)
 
     feature_frames = [feat_a, feat_b, feat_c, feat_d,
-                      feat_e, feat_f, feat_g, feat_h, feat_i]
+                      feat_e, feat_f, feat_g, feat_h, feat_i, feat_j]
 
     # 全てのカテゴリを横結合
     result = df[["race_id", "car_no"]].copy()
@@ -187,14 +189,20 @@ def calc_racer_features(df: pd.DataFrame,
     NULLが100%の特徴量は情報を持たないので除外する
     将来KEIRIN.JP等から補完できたら再度追加する
     """
-    CLASS_MAP = {"SS": 5, "S1": 4, "S2": 3, "A1": 2, "A2": 1, "A3": 0}
+    CLASS_MAP = {
+        "SS": 6, "S1": 5, "S2": 4,
+        "A1": 3, "A2": 2, "A3": 1,
+        # 全角対応
+        "ＳＳ": 6, "Ｓ１": 5, "Ｓ２": 4,
+        "Ａ１": 3, "Ａ２": 2, "Ａ３": 1,
+    }
 
     out = df[["race_id", "car_no"]].copy()
-    out["A01_racer_class"]  = df["racer_class"].map(CLASS_MAP).fillna(0).astype(int)
+    out["A01_racer_class"]  = df["racer_class"].map(CLASS_MAP).fillna(2).astype(int)
     out["A02_grade_score"]  = df["grade_score"].fillna(df["grade_score"].mean())
-    out["A03_win_rate"]     = df["win_rate"].fillna(0.0)
-    out["A04_second_rate"]  = df["second_rate"].fillna(0.0)
-    out["A05_third_rate"]   = df["third_rate"].fillna(0.0)
+    out["A03_win_rate"]     = df["win_rate"].fillna(df["win_rate"].mean() if "win_rate" in df.columns and df["win_rate"].notna().any() else 15.0)
+    out["A04_second_rate"]  = df["second_rate"].fillna(df["second_rate"].mean() if "second_rate" in df.columns and df["second_rate"].notna().any() else 30.0)
+    out["A05_third_rate"]   = df["third_rate"].fillna(df["third_rate"].mean() if "third_rate" in df.columns and df["third_rate"].notna().any() else 45.0)
     out["A06_style_num"]    = df["style"].map(STYLE_MAP).fillna(0).astype(int)
     out["A07_gear_ratio"]   = df["gear_ratio"].fillna(3.6)   # 未検証：平均値3.6を仮置き
     out["A08_back_count"]   = df["back_count"].fillna(0).astype(int)   # 最重要
@@ -1406,6 +1414,38 @@ def _compute_elo_full(db_path):
 
 
 # =============================================================
+# =============================================================
+# カテゴリJ：決まり手実績（3特徴量）← 新規
+# =============================================================
+
+def calc_kimari_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    J-01 nige_rate（逃げ率 = nige_count / 決まり手合計）
+    J-02 makuri_rate（捲り率）
+    J-03 sashi_rate（差し率）
+
+    脚質コード（style_num）と重複するが、
+    実績ベースの比率の方が精度が高い可能性があるため追加。
+    """
+    out = df[["race_id", "car_no"]].copy()
+
+    # 決まり手合計（nige + makuri + sashi + mark）
+    nige = pd.to_numeric(df["nige_count"], errors="coerce").fillna(0) if "nige_count" in df.columns else pd.Series(0, index=df.index)
+    makuri = pd.to_numeric(df["makuri_count"], errors="coerce").fillna(0) if "makuri_count" in df.columns else pd.Series(0, index=df.index)
+    sashi = pd.to_numeric(df["sashi_count"], errors="coerce").fillna(0) if "sashi_count" in df.columns else pd.Series(0, index=df.index)
+    mark = pd.to_numeric(df["mark_count"], errors="coerce").fillna(0) if "mark_count" in df.columns else pd.Series(0, index=df.index)
+    total = nige + makuri + sashi + mark
+
+    # ゼロ除算防止
+    safe_total = total.replace(0, 1)
+
+    out["J01_nige_rate"]   = (nige / safe_total).round(4)
+    out["J02_makuri_rate"] = (makuri / safe_total).round(4)
+    out["J03_sashi_rate"]  = (sashi / safe_total).round(4)
+
+    return out
+
+
 def _calc_recent_agari_avg(senshu_name, race_date, db_path, n=10):
     """
     I-05: 直近 n レースの上がりタイム平均。
@@ -1469,7 +1509,7 @@ def _calc_agari_trend(senshu_name, race_date, db_path):
         return 0.0
 
 
-# 特徴量名一覧（58特徴量）
+# 特徴量名一覧（61特徴量）
 # =============================================================
 
 FEATURE_NAMES = [
@@ -1506,6 +1546,8 @@ FEATURE_NAMES = [
     "I01_home_venue_win_rate", "I02_recent_trend_score",
     "I03_h2h_win_rate", "I04_elo_rating",
     "I05_recent_agari_avg", "I06_agari_trend",
+    # J: 決まり手実績（3）
+    "J01_nige_rate", "J02_makuri_rate", "J03_sashi_rate",
 ]
 
-assert len(FEATURE_NAMES) == 58, f"特徴量数が{len(FEATURE_NAMES)}です（58であるべき）"
+assert len(FEATURE_NAMES) == 61, f"特徴量数が{len(FEATURE_NAMES)}です（61であるべき）"
