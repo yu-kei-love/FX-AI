@@ -9,10 +9,10 @@
 #   D: 展開予測（4）← 既存AIにない特徴
 #   E: 風・天候（5）
 #   F: オッズ（6）
-#   G: レース構成（5）
+#   G: レース構成（6）← is_midnight追加
 #   H: レース内相対（4）
 #   I: 履歴（6）← 当場勝率・トレンド・相性・Elo・上がりタイム
-#   合計：57特徴量
+#   合計：58特徴量
 #
 # 注意：データがない状態でもコードを完成させた。
 #       動作確認・学習はデータが揃ってから行う。
@@ -36,10 +36,20 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "keirin" / "keirin.db"
 
 # グレード数値化マップ
-GRADE_MAP = {"GP": 6, "G1": 5, "G2": 4, "G3": 3, "F1": 2, "F2": 1, None: 0}
+# グレード数値化マップ（Kドリームズ準拠）
+GRADE_MAP = {
+    "GP": 6, "G1": 5, "G2": 4, "G3": 3,
+    "FI": 2, "FII": 1,
+    "F1": 2, "F2": 1,  # 旧キー互換
+    None: 2,  # デフォルト=FI相当
+}
 
-# レースタイプ数値化マップ
-RACE_TYPE_MAP = {"決勝": 3, "準決": 2, "予選": 1, None: 0}
+# ステージ数値化マップ（Kドリームズ準拠）
+RACE_TYPE_MAP = {
+    "決勝": 4, "準決": 3, "特選": 2, "選抜": 2,
+    "一般": 1, "予選": 1,
+    None: 1,  # デフォルト=一般
+}
 
 # 脚質数値化マップ
 STYLE_MAP = {"逃げ": 2, "追込": 1, "両": 0, None: 0}
@@ -98,7 +108,7 @@ def create_features(entries_df, races_df, odds_df,
                     line_probs=None, bank_info=None,
                     db_path=None):
     """
-    全57特徴量を計算して返す。
+    全58特徴量を計算して返す。
 
     Parameters:
         entries_df : 出走情報DataFrame
@@ -830,7 +840,7 @@ def _detect_surge_from_odds_history(db_path, threshold=0.3):
 
 
 # =============================================================
-# カテゴリG：レース構成（5特徴量）
+# カテゴリG：レース構成（6特徴量）
 # =============================================================
 
 def calc_race_features(df: pd.DataFrame,
@@ -841,6 +851,7 @@ def calc_race_features(df: pd.DataFrame,
     G-03 race_type_num（予選/準決/決勝 を数値化）
     G-04 field_strength（競走得点の平均）
     G-05 n_single（単騎選手の数）
+    G-06 is_midnight（ミッドナイトフラグ 0/1）
     """
     line_probs = line_probs or {}
     out = df[["race_id", "car_no"]].copy()
@@ -859,6 +870,12 @@ def calc_race_features(df: pd.DataFrame,
     # G-05: 単騎人数（line_probs から計算）
     n_singles = sum(1 for k in line_probs if "-" not in k)
     out["G05_n_single"] = n_singles
+
+    # G-06: ミッドナイトフラグ
+    out["G06_is_midnight"] = (
+        df["is_midnight"].fillna(0).astype(int)
+        if "is_midnight" in df.columns else 0
+    )
 
     return out
 
@@ -1452,7 +1469,7 @@ def _calc_agari_trend(senshu_name, race_date, db_path):
         return 0.0
 
 
-# 特徴量名一覧（57特徴量）
+# 特徴量名一覧（58特徴量）
 # =============================================================
 
 FEATURE_NAMES = [
@@ -1479,9 +1496,9 @@ FEATURE_NAMES = [
     # F: オッズ（6）
     "F01_win_odds_final", "F02_win_odds_rank", "F03_implied_prob",
     "F04_odds_change_total", "F05_odds_surge_flag", "F06_odds_stability",
-    # G: レース構成（5）
+    # G: レース構成（6）
     "G01_race_no", "G02_grade_num", "G03_race_type_num",
-    "G04_field_strength", "G05_n_single",
+    "G04_field_strength", "G05_n_single", "G06_is_midnight",
     # H: レース内相対（4）
     "H01_grade_score_rank", "H02_back_count_rank",
     "H03_grade_score_vs_field", "H04_is_home",
@@ -1491,4 +1508,4 @@ FEATURE_NAMES = [
     "I05_recent_agari_avg", "I06_agari_trend",
 ]
 
-assert len(FEATURE_NAMES) == 57, f"特徴量数が{len(FEATURE_NAMES)}です（57であるべき）"
+assert len(FEATURE_NAMES) == 58, f"特徴量数が{len(FEATURE_NAMES)}です（58であるべき）"

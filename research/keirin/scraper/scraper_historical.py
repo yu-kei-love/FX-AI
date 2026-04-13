@@ -184,6 +184,17 @@ class ChariLotoScraper:
             except sqlite3.OperationalError as e:
                 logger.warning("start_count 追加失敗: %s", e)
 
+        # races テーブルのマイグレーション
+        cur.execute("PRAGMA table_info(races)")
+        races_cols = {row[1] for row in cur.fetchall()}
+        for col, typ in [("is_midnight", "INTEGER"), ("race_type", "TEXT")]:
+            if col not in races_cols:
+                try:
+                    cur.execute(f"ALTER TABLE races ADD COLUMN {col} {typ}")
+                    logger.info("races テーブルに %s カラムを追加", col)
+                except sqlite3.OperationalError as e:
+                    logger.warning("%s 追加失敗: %s", col, e)
+
         cur.execute("PRAGMA table_info(results)")
         result_cols = {row[1] for row in cur.fetchall()}
         for col, typ in [("agari_time", "REAL"), ("chakusa", "TEXT")]:
@@ -1492,6 +1503,227 @@ class KdreamsSupplementScraper:
         conn.close()
         return dates
 
+    # =========================================================
+    # grade / stage / is_midnight / race_type の補完
+    # =========================================================
+
+    def supplement_race_info(self, date_str):
+        """
+        指定日のracesテーブルで grade が NULL のレースを
+        Kドリームズの racedetail ページタイトルから補完する。
+
+        タイトル例:
+        「松阪競輪 レース詳細 | ウィンチケットミッドナイト競輪
+          1R チャレンジ一般 | 2024年01月08日」
+
+        Parameters:
+            date_str: "YYYY-MM-DD" 形式
+        """
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            logger.error("日付パース失敗: %s", date_str)
+            return
+        date_compact = dt.strftime("%Y%m%d")
+
+        # grade が NULL のレースを取得
+        conn = self._connect_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT race_id, jyo_cd, race_no
+            FROM races
+            WHERE race_date = ? AND grade IS NULL
+            ORDER BY race_id
+        """, (date_compact,))
+        targets = cur.fetchall()
+        conn.close()
+
+        if not targets:
+            logger.info("[%s] race_info 補完対象なし", date_str)
+            return
+
+        # jyo_cd → jka_code
+        target_jkas = set()
+        by_race = {}
+        for race_id, jyo_cd, race_no in targets:
+            jka = self.venue_id_to_jka.get(int(jyo_cd))
+            if jka is None:
+                continue
+            target_jkas.add(jka)
+            by_race[race_id] = {
+                "jka_code": jka,
+                "race_no": race_no,
+                "jyo_cd": jyo_cd,
+            }
+
+        logger.info("[%s] race_info 補完対象: %d レース", date_str, len(by_race))
+
+        # racecard URL を取得
+        racecard_entries = self._fetch_racecard_urls(date_str)
+        self._polite_sleep()
+
+        if not racecard_entries:
+            logger.warning("[%s] racecard 取得失敗", date_str)
+            return
+
+        # (jka, race_no) → racecard entry
+        url_map = {}
+        for e in racecard_entries:
+            if e["jka_code"] in target_jkas:
+                url_map[(e["jka_code"], e["race_no"])] = e
+
+        # 各レースの racedetail タイトルからパース
+        url_cache = {}  # url → title
+        updates = []
+
+        for race_id, info in by_race.items():
+            key = (info["jka_code"], info["race_no"])
+            entry = url_map.get(key)
+            if entry is None:
+                continue
+
+            url = entry["url"]
+            if url not in url_cache:
+                html = self._fetch_html(url)
+                self._polite_sleep()
+                if html is None:
+                    url_cache[url] = None
+                    continue
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, "html.parser")
+                title_tag = soup.find("title")
+                title = title_tag.text.strip() if title_tag else ""
+                url_cache[url] = title
+            else:
+                title = url_cache[url]
+
+            if title is None:
+                continue
+
+            parsed = self._parse_race_info_from_title(title)
+            updates.append({
+                "race_id": race_id,
+                **parsed,
+            })
+
+        # DB更新
+        if updates:
+            conn = self._connect_db()
+            cur = conn.cursor()
+            for u in updates:
+                try:
+                    cur.execute("""
+                        UPDATE races
+                        SET grade = ?, stage = ?,
+                            is_midnight = ?, race_type = ?
+                        WHERE race_id = ? AND grade IS NULL
+                    """, (
+                        u["grade"], u["stage"],
+                        u["is_midnight"], u["race_type"],
+                        u["race_id"],
+                    ))
+                except sqlite3.Error as e:
+                    logger.warning("races UPDATE エラー %s: %s",
+                                   u["race_id"], e)
+            conn.commit()
+            conn.close()
+
+        logger.info("[%s] race_info 完了: %d 件更新", date_str, len(updates))
+
+    def _parse_race_info_from_title(self, title):
+        """
+        Kドリームズのページタイトルから
+        grade / stage / is_midnight / race_type をパースする。
+
+        Parameters:
+            title: ページタイトル文字列
+
+        Returns:
+            dict: {grade, stage, is_midnight, race_type}
+        """
+        # is_midnight
+        is_midnight = 1 if "ミッドナイト" in title else 0
+
+        # race_type
+        if "ミッドナイト" in title:
+            race_type = "ミッドナイト"
+        elif "モーニング" in title:
+            race_type = "モーニング"
+        elif "ナイター" in title:
+            race_type = "ナイター"
+        else:
+            race_type = "デイ"
+
+        # grade（優先度順にマッチ）
+        if "グランプリ" in title or "ＧＰ" in title:
+            grade = "GP"
+        elif "GI" in title or "ＧＩ" in title:
+            grade = "G1"
+        elif "GII" in title or "ＧＩＩ" in title:
+            grade = "G2"
+        elif "GIII" in title or "ＧＩＩＩ" in title:
+            grade = "G3"
+        elif "チャレンジ" in title or "FII" in title or "ＦＩＩ" in title:
+            grade = "FII"
+        elif "FI" in title or "ＦＩ" in title:
+            grade = "FI"
+        else:
+            grade = "FI"  # デフォルト
+
+        # stage
+        if "決勝" in title:
+            stage = "決勝"
+        elif "準決" in title:
+            stage = "準決"
+        elif "特選" in title:
+            stage = "特選"
+        elif "選抜" in title:
+            stage = "選抜"
+        elif "一般" in title:
+            stage = "一般"
+        elif "予選" in title:
+            stage = "予選"
+        else:
+            stage = "一般"  # デフォルト
+
+        return {
+            "grade": grade,
+            "stage": stage,
+            "is_midnight": is_midnight,
+            "race_type": race_type,
+        }
+
+    def supplement_race_info_all(self):
+        """DB全体の grade IS NULL のレースを日付別に一括補完する"""
+        conn = self._connect_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT race_date
+            FROM races
+            WHERE grade IS NULL
+            ORDER BY race_date
+        """)
+        dates = [row[0] for row in cur.fetchall()]
+        conn.close()
+
+        if not dates:
+            logger.info("race_info 補完対象なし")
+            return
+
+        logger.info("race_info 補完対象日数: %d", len(dates))
+        for i, date_compact in enumerate(dates, 1):
+            try:
+                dt = datetime.strptime(date_compact, "%Y%m%d")
+            except ValueError:
+                continue
+            date_str = dt.strftime("%Y-%m-%d")
+            logger.info("[%d/%d] %s の race_info 補完", i, len(dates), date_str)
+            try:
+                self.supplement_race_info(date_str)
+            except Exception as e:
+                logger.error("[%s] race_info エラー: %s", date_str, e)
+                self._log_failed(f"race_info_{date_str}", str(e))
+
 
     # =========================================================
     # 上がりタイム・着差のバックフィル
@@ -1628,6 +1860,11 @@ def main():
                              "（例: 2022-04-20,2023-08-26）")
     parser.add_argument("--backfill_agari", action="store_true",
                         help="agari_timeがNULLのレースの上がりタイムを再取得")
+    parser.add_argument("--race_info", type=str, default=None,
+                        help="Kドリームズからgrade/stage/is_midnightを補完"
+                             "（YYYY-MM-DD）")
+    parser.add_argument("--race_info_all", action="store_true",
+                        help="grade/stage/is_midnightを全件補完")
 
     args = parser.parse_args()
 
@@ -1641,6 +1878,21 @@ def main():
         except ValueError as e:
             logger.error("--jyo_cds の形式が不正: %s", e)
             return
+
+    # race_info 補完
+    if args.race_info or args.race_info_all:
+        try:
+            supp = KdreamsSupplementScraper(
+                db_path=args.db, delay=args.delay,
+            )
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            return
+        if args.race_info_all:
+            supp.supplement_race_info_all()
+        else:
+            supp.supplement_race_info(args.race_info)
+        return
 
     # 上がりタイムバックフィル
     if args.backfill_agari:
