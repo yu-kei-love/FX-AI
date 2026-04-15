@@ -647,6 +647,61 @@ class GambooScraper:
 
         logger.info("[%s] 並び予想: %d件保存", date_str, total)
 
+    def scrape_backfill_range(self, start_date, end_date):
+        """
+        指定期間のコメント・並び予想をバックフィルする（並列実行用）。
+
+        既に comments/reporter_predictions に入っている race_id は
+        scrape_comments_for_date 内部でスキップされる。
+
+        Parameters:
+            start_date: "YYYY-MM-DD" 形式
+            end_date:   "YYYY-MM-DD" 形式
+        """
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError as e:
+            logger.error("日付パース失敗: %s", e)
+            return
+
+        start_c = start_dt.strftime("%Y%m%d")
+        end_c = end_dt.strftime("%Y%m%d")
+
+        # 期間内で races に存在する日付を取得
+        conn = self._connect_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT race_date FROM races
+            WHERE race_date >= ? AND race_date <= ?
+            ORDER BY race_date
+        """, (start_c, end_c))
+        dates = [row[0] for row in cur.fetchall()]
+        conn.close()
+
+        if not dates:
+            logger.info("[%s 〜 %s] DBにレースなし", start_date, end_date)
+            return
+
+        logger.info("=== バックフィル開始 ===")
+        logger.info("期間: %s 〜 %s（%d 日）",
+                    start_date, end_date, len(dates))
+
+        for i, dc in enumerate(dates, 1):
+            try:
+                dt = datetime.strptime(dc, "%Y%m%d")
+            except ValueError:
+                continue
+            ds = dt.strftime("%Y-%m-%d")
+            logger.info("[%d/%d] %s", i, len(dates), ds)
+            try:
+                self.scrape_comments_for_date(ds)
+            except Exception as e:
+                logger.error("[%s] エラー: %s", ds, e)
+                self._log_failed(f"backfill_{ds}", str(e))
+
+        logger.info("=== バックフィル完了 ===")
+
     def scrape_missing_comments(self):
         """DB内でコメント未取得のrace_dateを自動検出して順次補完する"""
         conn = self._connect_db()
@@ -762,6 +817,9 @@ def main():
                         help="並び予想取得")
     parser.add_argument("--missing", action="store_true",
                         help="未取得分を自動検出して取得（両方）")
+    parser.add_argument("--backfill_range", type=str, nargs=2,
+                        metavar=("START", "END"),
+                        help="期間バックフィル（例: 2022-01-01 2022-12-31）")
     parser.add_argument("--status", action="store_true",
                         help="取得済み件数を表示")
     parser.add_argument("--delay", type=float, default=3.0,
@@ -782,6 +840,12 @@ def main():
 
     if args.missing:
         scraper.scrape_missing_comments()
+        scraper.get_status()
+        return
+
+    if args.backfill_range:
+        start, end = args.backfill_range
+        scraper.scrape_backfill_range(start, end)
         scraper.get_status()
         return
 
