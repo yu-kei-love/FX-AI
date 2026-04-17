@@ -579,6 +579,18 @@ class ChariLotoScraper:
         except (ValueError, TypeError):
             return None
 
+    def _to_float(self, val):
+        """値をfloatに変換。失敗時はNone。"""
+        if val is None or pd.isna(val):
+            return None
+        try:
+            s = str(val).strip().replace(",", "")
+            if s in ("", "nan", "NaN", "-", "---"):
+                return None
+            return float(s)
+        except (ValueError, TypeError):
+            return None
+
     def _clean_str(self, val):
         """文字列を正規化。nanや空はNone。"""
         if val is None or pd.isna(val):
@@ -868,6 +880,153 @@ class ChariLotoScraper:
             "day_count": day_count,
             "venue_count": venue_count,
         }
+
+
+    # =========================================================
+    # 上がりタイム・着差のバックフィル
+    # =========================================================
+
+    def backfill_agari(self, start_date=None, end_date=None):
+        """
+        agari_time が NULL の race_id を再取得して
+        agari_time と chakusa を埋める。
+
+        既存の race_id を chariloto から再取得し、
+        results テーブルを UPDATE する。
+
+        Parameters:
+            start_date: 開始日（省略時は全期間）
+            end_date:   終了日（省略時は全期間）
+
+        会場フィルタ: self.jyo_cds が限定されている場合、
+        その JKA コードに対応する venue_id のみ処理する。
+        """
+        # 日付範囲（省略時は全期間）
+        if start_date and end_date:
+            start_dt = self._parse_date(start_date)
+            end_dt = self._parse_date(end_date)
+            if start_dt is None or end_dt is None:
+                logger.error("日付パース失敗: %s, %s", start_date, end_date)
+                return
+            start_compact = start_dt.strftime("%Y%m%d")
+            end_compact = end_dt.strftime("%Y%m%d")
+        else:
+            start_compact = "00000000"
+            end_compact = "99999999"
+
+        # --jyo_cds で絞り込み（JKA コード → venue_id に変換）
+        jka_to_vid = {}
+        for info in BANK_MASTER.values():
+            vid = info.get("venue_id")
+            jka = info.get("jka_code")
+            if vid and jka:
+                jka_to_vid[jka] = int(vid)
+
+        # 処理対象の venue_id セット
+        if len(self.jyo_cds) == len(JKA_CODES):
+            target_vids = None  # 全会場
+        else:
+            target_vids = set()
+            for jka in self.jyo_cds:
+                vid = jka_to_vid.get(jka)
+                if vid is not None:
+                    target_vids.add(vid)
+            if not target_vids:
+                logger.warning("backfill_agari: 対象会場なし（jyo_cds=%s）",
+                               self.jyo_cds)
+                return
+
+        conn = self._connect_db()
+        cur = conn.cursor()
+
+        # agari_time が NULL のレース日付+会場を取得
+        base_sql = """
+            SELECT DISTINCT rc.race_date, rc.jyo_cd
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.agari_time IS NULL
+              AND rc.race_date >= ?
+              AND rc.race_date <= ?
+        """
+        params = [start_compact, end_compact]
+        if target_vids is not None:
+            placeholders = ",".join(["?"] * len(target_vids))
+            base_sql += f" AND rc.jyo_cd IN ({placeholders})"
+            params.extend(target_vids)
+        base_sql += " ORDER BY rc.race_date"
+        cur.execute(base_sql, params)
+        targets = cur.fetchall()
+        conn.close()
+
+        if not targets:
+            logger.info("backfill_agari: 対象なし")
+            return
+
+        logger.info("backfill_agari: %d 会場日を処理", len(targets))
+
+        # venue_id → jka_code マップ
+        vid_to_jka = {}
+        for info in BANK_MASTER.values():
+            vid = info.get("venue_id")
+            jka = info.get("jka_code")
+            if vid and jka:
+                vid_to_jka[int(vid)] = jka
+
+        updated_total = 0
+        for i, (race_date, jyo_cd) in enumerate(targets, 1):
+            jka = vid_to_jka.get(int(jyo_cd))
+            if jka is None:
+                continue
+
+            try:
+                dt = datetime.strptime(race_date, "%Y%m%d")
+            except ValueError:
+                continue
+            date_str = dt.strftime("%Y-%m-%d")
+
+            logger.info("[%d/%d] %s jyo=%s → jka=%s",
+                        i, len(targets), date_str, jyo_cd, jka)
+
+            try:
+                parsed_races = self.scrape_race_result(jka, date_str)
+            except Exception as e:
+                logger.error("取得失敗 %s/%s: %s", jka, date_str, e)
+                self._polite_sleep()
+                continue
+
+            if not parsed_races:
+                self._polite_sleep()
+                continue
+
+            # UPDATE（agari_time / chakusa のみ）
+            conn = self._connect_db()
+            cur = conn.cursor()
+            n_updated = 0
+            for pr in parsed_races:
+                for r in pr["results"]:
+                    if r.get("agari_time") is not None:
+                        cur.execute("""
+                            UPDATE results
+                            SET agari_time = ?, chakusa = ?
+                            WHERE race_id = ? AND rank = ?
+                              AND agari_time IS NULL
+                        """, (
+                            r["agari_time"],
+                            r.get("chakusa"),
+                            r["race_id"],
+                            r["rank"],
+                        ))
+                        n_updated += cur.rowcount
+            conn.commit()
+            conn.close()
+
+            if n_updated > 0:
+                updated_total += n_updated
+                logger.info("  → %d 件更新", n_updated)
+
+            self._polite_sleep()
+
+        logger.info("backfill_agari 完了: %d 件更新", updated_total)
 
 
 # =========================================================
@@ -1827,111 +1986,6 @@ class KdreamsSupplementScraper:
                 self._log_failed(f"race_info_{date_str}", str(e))
 
 
-    # =========================================================
-    # 上がりタイム・着差のバックフィル
-    # =========================================================
-
-    def backfill_agari(self, start_date, end_date):
-        """
-        agari_time が NULL の race_id を再取得して
-        agari_time と chakusa を埋める。
-
-        既存の race_id を chariloto から再取得し、
-        results テーブルを UPDATE する。
-        """
-        start_dt = self._parse_date(start_date)
-        end_dt = self._parse_date(end_date)
-        if start_dt is None or end_dt is None:
-            logger.error("日付パース失敗: %s, %s", start_date, end_date)
-            return
-
-        conn = self._connect_db()
-        cur = conn.cursor()
-
-        # agari_time が NULL のレース日付+会場を取得
-        cur.execute("""
-            SELECT DISTINCT rc.race_date, rc.jyo_cd
-            FROM results r
-            JOIN races rc ON r.race_id = rc.race_id
-            WHERE r.agari_time IS NULL
-              AND rc.race_date >= ?
-              AND rc.race_date <= ?
-            ORDER BY rc.race_date
-        """, (start_dt.strftime("%Y%m%d"), end_dt.strftime("%Y%m%d")))
-        targets = cur.fetchall()
-        conn.close()
-
-        if not targets:
-            logger.info("backfill_agari: 対象なし")
-            return
-
-        logger.info("backfill_agari: %d 会場日を処理", len(targets))
-
-        # venue_id → jka_code マップ
-        vid_to_jka = {}
-        for info in BANK_MASTER.values():
-            vid = info.get("venue_id")
-            jka = info.get("jka_code")
-            if vid and jka:
-                vid_to_jka[int(vid)] = jka
-
-        updated_total = 0
-        for i, (race_date, jyo_cd) in enumerate(targets, 1):
-            jka = vid_to_jka.get(int(jyo_cd))
-            if jka is None:
-                continue
-
-            try:
-                dt = datetime.strptime(race_date, "%Y%m%d")
-            except ValueError:
-                continue
-            date_str = dt.strftime("%Y-%m-%d")
-
-            logger.info("[%d/%d] %s jyo=%s → jka=%s",
-                        i, len(targets), date_str, jyo_cd, jka)
-
-            try:
-                parsed_races = self.scrape_race_result(jka, date_str)
-            except Exception as e:
-                logger.error("取得失敗 %s/%s: %s", jka, date_str, e)
-                self._polite_sleep()
-                continue
-
-            if not parsed_races:
-                self._polite_sleep()
-                continue
-
-            # UPDATE（agari_time / chakusa のみ）
-            conn = self._connect_db()
-            cur = conn.cursor()
-            n_updated = 0
-            for pr in parsed_races:
-                for r in pr["results"]:
-                    if r.get("agari_time") is not None:
-                        cur.execute("""
-                            UPDATE results
-                            SET agari_time = ?, chakusa = ?
-                            WHERE race_id = ? AND rank = ?
-                              AND agari_time IS NULL
-                        """, (
-                            r["agari_time"],
-                            r.get("chakusa"),
-                            r["race_id"],
-                            r["rank"],
-                        ))
-                        n_updated += cur.rowcount
-            conn.commit()
-            conn.close()
-
-            if n_updated > 0:
-                updated_total += n_updated
-                logger.info("  → %d 件更新", n_updated)
-
-            self._polite_sleep()
-
-        logger.info("backfill_agari 完了: %d 件更新", updated_total)
-
-
 # =========================================================
 # コマンドラインインターフェース
 # =========================================================
@@ -2007,10 +2061,9 @@ def main():
 
     # 上がりタイムバックフィル
     if args.backfill_agari:
-        if not args.start or not args.end:
-            logger.error("--backfill_agari には --start と --end が必要")
-            return
-        scraper = ChariLotoScraper(db_path=args.db, delay=args.delay)
+        scraper = ChariLotoScraper(
+            db_path=args.db, delay=args.delay, jyo_cds=jyo_cds,
+        )
         scraper.backfill_agari(args.start, args.end)
         return
 
