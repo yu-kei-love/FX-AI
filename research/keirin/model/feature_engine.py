@@ -1028,14 +1028,83 @@ def calc_history_features(df: pd.DataFrame,
         df, name_col, date_col, conn
     )
 
+    # I-05/I-06: 上がりタイム特徴量（バッチ計算）
+    agari_avg, agari_trend = _batch_agari_features(
+        df, name_col, date_col, conn
+    )
+    out["I05_recent_agari_avg"] = agari_avg
+    out["I06_agari_trend"] = agari_trend
+
     conn.close()
 
-    # I-05: 直近上がりタイム平均（デフォルト値で補完）
-    # agari_time がまだ全件NULLの場合が多いため
-    out["I05_recent_agari_avg"] = 11.5
-    out["I06_agari_trend"] = 0.0
-
     return out
+
+
+def _batch_agari_features(df, name_col, date_col, conn):
+    """
+    I-05 / I-06 の上がりタイム特徴量をバッチ計算する。
+
+    全選手の agari_time 付き戦績を一括読み込みし、
+    race_date < 条件をメモリ上で適用する（データリーク防止）。
+
+    Returns:
+        (Series, Series): (I05_recent_agari_avg, I06_agari_trend)
+    """
+    default_avg = pd.Series(11.5, index=df.index)
+    default_trend = pd.Series(0.0, index=df.index)
+
+    if name_col is None or date_col is None:
+        return default_avg, default_trend
+
+    # agari_time 付きの全戦績を読み込み
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT r.senshu_name, rc.race_date, r.agari_time
+        FROM results r
+        JOIN races rc ON r.race_id = rc.race_id
+        WHERE r.senshu_name IS NOT NULL
+          AND r.agari_time IS NOT NULL
+        ORDER BY rc.race_date DESC
+    """)
+    all_results = cur.fetchall()
+
+    if not all_results:
+        return default_avg, default_trend
+
+    # senshu_name → [(race_date, agari_time), ...] (降順)
+    from collections import defaultdict
+    agari_hist = defaultdict(list)
+    for sname, rdate, agari in all_results:
+        agari_hist[sname].append((rdate, agari))
+
+    def _calc_avg(row):
+        sname = row.get(name_col)
+        rdate = str(row.get(date_col, ""))
+        if not sname or not rdate:
+            return 11.5
+        hist = agari_hist.get(sname, [])
+        # race_date 未満の直近10件
+        past = [(d, t) for d, t in hist if d < rdate][:10]
+        if len(past) < 3:
+            return 11.5
+        return round(sum(t for _, t in past) / len(past), 3)
+
+    def _calc_trend(row):
+        sname = row.get(name_col)
+        rdate = str(row.get(date_col, ""))
+        if not sname or not rdate:
+            return 0.0
+        hist = agari_hist.get(sname, [])
+        past = [(d, t) for d, t in hist if d < rdate][:10]
+        if len(past) < 3:
+            return 0.0
+        avg_3 = sum(t for _, t in past[:3]) / 3
+        avg_10 = sum(t for _, t in past) / len(past)
+        return round(avg_3 - avg_10, 4)
+
+    agari_avg = df.apply(_calc_avg, axis=1)
+    agari_trend = df.apply(_calc_trend, axis=1)
+    return agari_avg, agari_trend
 
 
 def _batch_venue_win_rate(df, name_col, jyo_col, date_col, conn):

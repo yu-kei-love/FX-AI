@@ -226,19 +226,25 @@ class DataInterface:
         return where_sql, params
 
     def _sqlite_races(self, start_date, end_date, is_midnight_filter=None):
-        where_sql, params = self._sqlite_where(start_date, end_date)
-        # is_midnight フィルタ
+        # race_date カラムで絞り込み（YYYYMMDD形式で格納されている）
+        clauses, params = [], []
+        if start_date:
+            # 'YYYY-MM-DD' → 'YYYYMMDD' に正規化
+            clauses.append("r.race_date >= ?")
+            params.append(start_date.replace("-", ""))
+        if end_date:
+            clauses.append("r.race_date <= ?")
+            params.append(end_date.replace("-", ""))
         if is_midnight_filter is not None:
-            midnight_val = 1 if is_midnight_filter else 0
-            if where_sql:
-                where_sql += f" AND r.is_midnight = ?"
-            else:
-                where_sql = "WHERE r.is_midnight = ?"
-            params.append(midnight_val)
+            clauses.append("r.is_midnight = ?")
+            params.append(1 if is_midnight_filter else 0)
+
+        where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+
         conn = sqlite3.connect(self.db_path)
-        # race_date カラム対応（旧DB: date、新DB: race_date）
         df = pd.read_sql_query(
-            f"SELECT * FROM races r {where_sql} ORDER BY r.race_date, r.jyo_cd, r.race_no",
+            f"SELECT * FROM races r {where_sql} "
+            f"ORDER BY r.race_date, r.jyo_cd, r.race_no",
             conn, params=params,
         )
         conn.close()
