@@ -127,16 +127,16 @@ def load_training_data(is_midnight: bool, db_path: Path = DB_PATH):
     t0 = time.time()
 
     # create_features を一括で渡す
-    # 注意: db_path=None で履歴特徴量（I-01〜I-06）はデフォルト値になる
-    # 理由: 50万行に対して行ごとにSQLを叩くと数時間かかるため
-    # 履歴特徴量はメモリ一括計算方式に書き換えてから有効化する
+    # v0.24 で履歴特徴量(I-01〜I-06)はバッチプリロード方式に改修済み
+    # DBパスを渡すことで I-01 当場勝率、I-02 トレンド、I-04 Elo が
+    # 実データで計算される（I-03 h2h と I-05/I-06 agari はデフォルト値のまま）
     features = create_features(
         entries_df=entries_df,
         races_df=races_df,
         odds_df=pd.DataFrame(),  # オッズは未取得のため空
         line_probs=None,
         bank_info=None,
-        db_path=None,  # 履歴特徴量はデフォルト値（パフォーマンス理由）
+        db_path=str(db_path),
     )
     elapsed = time.time() - t0
     print(f"[{label}] 特徴量計算完了: {elapsed:.1f}秒, {len(features):,}行")
