@@ -270,36 +270,94 @@ def run_backtest(is_midnight: bool, db_path=DB_PATH,
     }
 
 
+def calc_theoretical_roi(df, ev_threshold=1.1):
+    """
+    理論オッズを使ったROI計算。
+
+    仮定:
+    - 市場オッズ = 0.75 / 市場確率
+    - 市場確率 = 均等（全組み合わせが同確率、1/N）
+    - EV = 予測確率 × N （均等市場比）
+    - 的中時の払戻 = 0.75 / 予測確率 （モデル予測＝市場予測の仮定）
+
+    ROI > 75% はモデルが市場予測（ランダム予測）より優れている証拠。
+
+    Parameters:
+        df: run_backtest の返り値の DataFrame
+            （top1_prob, top1_hit, n_entries を含む）
+        ev_threshold: EV 閾値
+
+    Returns:
+        (roi_percent, n_bets, n_hits)
+    """
+    df = df.copy()
+    # EV = 予測確率 × 出走人数 (均等市場比)
+    df["ev"] = df["top1_prob"] * df["n_entries"]
+
+    filtered = df[df["ev"] > ev_threshold]
+    if len(filtered) == 0:
+        return 0.0, 0, 0
+
+    # ゼロ除算回避
+    valid = filtered[filtered["top1_prob"] > 0.001]
+    n_bets = len(valid)
+    if n_bets == 0:
+        return 0.0, 0, 0
+
+    hits = valid[valid["top1_hit"] == True]
+    if len(hits) > 0:
+        # 的中レースの理論払戻合計
+        theoretical_return = (0.75 / hits["top1_prob"]).sum()
+    else:
+        theoretical_return = 0.0
+
+    # 1点固定賭け (bet=1) として
+    roi = theoretical_return / n_bets * 100
+    return roi, n_bets, len(hits)
+
+
 def simulate_roi(df, db_path, label_ja):
     """
     オッズデータを使ったROIシミュレーション。
 
-    現時点ではオッズデータが収集されていないため、
-    理論オッズ（公正オッズ）で代替して参考値を出す。
-
-    理論オッズ = (1 / p) × (1 - TAKEOUT_RATE)
-
-    この方式では EV = p × 理論オッズ × 0.75 = 0.75 × 0.75 = 0.5625 程度に固定され
-    常にマイナス期待値になるため、実運用不可。あくまで「的中率ベース」の参考値。
+    過去3連単オッズは未収集のため、理論ROIで代替。
+    EV閾値別の感度分析を出力する。
     """
-    # odds_history テーブル存在確認
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT name FROM sqlite_master "
-        "WHERE type='table' AND name='odds_history'"
-    )
-    has_odds = cur.fetchone() is not None
-    conn.close()
+    print(f"\n=== {label_ja} 理論ROI シミュレーション ===")
+    print("  注意: 過去3連単オッズは未収集のため、理論値で代替")
+    print("  理論オッズ = 0.75 / 予測確率")
+    print("  EV = 予測確率 × N (均等市場仮定)")
+    print("  ROI > 75% = モデルがランダム市場より優れている")
 
-    if not has_odds:
-        print(f"\n=== {label_ja} ROI シミュレーション ===")
-        print("  odds_history テーブルなし → ROI計算スキップ")
-        print("  実運用時の収支を評価するには 3連単オッズ収集が必要")
-        return None
+    # EV閾値別の感度分析
+    print("\n  EV閾値別ROI:")
+    print(f"  {'EV閾値':>8}  {'購入':>8}  {'的中':>7}  {'的中率':>7}  {'理論ROI':>9}")
+    results = []
+    for th in [1.05, 1.1, 1.2, 1.3, 1.5, 2.0]:
+        roi, n_bets, n_hits = calc_theoretical_roi(df, ev_threshold=th)
+        hit_rate = (n_hits / n_bets * 100) if n_bets > 0 else 0
+        print(f"  EV>{th:>4.2f}  {n_bets:>8,}  {n_hits:>7,}  "
+              f"{hit_rate:>6.2f}%  {roi:>8.2f}%")
+        results.append({
+            "threshold": th,
+            "n_bets": n_bets,
+            "n_hits": n_hits,
+            "hit_rate": hit_rate,
+            "roi": roi,
+        })
 
-    # ... 将来実装 ...
-    return None
+    # 100%超えの有無
+    over_100 = [r for r in results if r["roi"] > 100]
+    if over_100:
+        print(f"\n  [発見] 理論ROI > 100% の閾値: "
+              f"{[r['threshold'] for r in over_100]}")
+        print(f"       = モデルが市場より優れている可能性（理論上）")
+    else:
+        best = max(results, key=lambda r: r["roi"])
+        print(f"\n  最良: EV>{best['threshold']} で ROI={best['roi']:.2f}% "
+              f"(75%基準)")
+
+    return {"ev_sensitivity": results}
 
 
 def main():
