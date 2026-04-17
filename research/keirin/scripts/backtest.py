@@ -132,7 +132,8 @@ def compute_features(entries_df, races_df, db_path):
     return features
 
 
-def run_backtest(is_midnight: bool, db_path=DB_PATH):
+def run_backtest(is_midnight: bool, db_path=DB_PATH,
+                 model_suffix: str = None):
     """
     バックテスト本体。
 
@@ -141,6 +142,10 @@ def run_backtest(is_midnight: bool, db_path=DB_PATH):
     3. Stage1Model で 1着確率を予測
     4. レースごとに予測上位の的中率を計算
     5. odds_history が存在すればトライフェクタEV計算
+
+    Parameters:
+        model_suffix: モデルファイル名サフィックス
+                      例: "2023" → stage1_{label}_2023.pkl
     """
     label = "midnight" if is_midnight else "normal"
     label_ja = "ミッドナイト" if is_midnight else "通常"
@@ -150,7 +155,10 @@ def run_backtest(is_midnight: bool, db_path=DB_PATH):
     print(f"{'='*60}\n")
 
     # モデル読み込み
-    model_path = MODEL_DIR / f"stage1_{label}.pkl"
+    if model_suffix:
+        model_path = MODEL_DIR / f"stage1_{label}_{model_suffix}.pkl"
+    else:
+        model_path = MODEL_DIR / f"stage1_{label}.pkl"
     if not model_path.exists():
         print(f"モデルなし: {model_path}")
         return None
@@ -295,22 +303,28 @@ def simulate_roi(df, db_path, label_ja):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Stage1 バックテスト")
+    parser.add_argument("--model_suffix", type=str, default=None,
+                        help="モデルファイル名サフィックス "
+                             "（例: 2023 → stage1_*_2023.pkl を使用）")
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  競輪AI バックテスト")
     print("=" * 60)
     print(f"  テスト期間: {TEST_START} 〜 {TEST_END}")
-    print()
-    print("[注意]注意: 現在のモデルは全期間(2022-2024)で学習されているため")
-    print("     データリークがあり、正確な汎化性能は測れません。")
-    print("     本来は2022-2023で再学習が必要です。")
-    print("     （まずは動作確認として実行）")
+    if args.model_suffix:
+        print(f"  モデル: stage1_*_{args.model_suffix}.pkl")
+    else:
+        print(f"  モデル: stage1_*.pkl (全期間学習・データリーク注意)")
     print()
 
     results = []
-    r = run_backtest(is_midnight=False)
+    r = run_backtest(is_midnight=False, model_suffix=args.model_suffix)
     if r:
         results.append(r)
-    r = run_backtest(is_midnight=True)
+    r = run_backtest(is_midnight=True, model_suffix=args.model_suffix)
     if r:
         results.append(r)
 

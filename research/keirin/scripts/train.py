@@ -35,13 +35,16 @@ MODEL_DIR = PROJECT_DIR / "models"
 MODEL_DIR.mkdir(exist_ok=True)
 
 
-def load_training_data(is_midnight: bool, db_path: Path = DB_PATH):
+def load_training_data(is_midnight: bool, db_path: Path = DB_PATH,
+                       train_start: str = None, train_end: str = None):
     """
     学習用データを読み込み、特徴量とターゲットを生成する。
 
     Parameters:
         is_midnight: True→ミッドナイト、False→通常レース
         db_path: SQLiteのパス
+        train_start: 学習データ開始日 "YYYY-MM-DD"（省略時は全期間）
+        train_end:   学習データ終了日 "YYYY-MM-DD"（省略時は全期間）
 
     Returns:
         X: 特徴量DataFrame (1行=1選手)
@@ -52,15 +55,27 @@ def load_training_data(is_midnight: bool, db_path: Path = DB_PATH):
     label = "ミッドナイト" if is_midnight else "通常"
     midnight_val = 1 if is_midnight else 0
 
+    # 日付範囲を YYYYMMDD 形式に（races.race_date の格納形式）
+    start_compact = train_start.replace("-", "") if train_start else None
+    end_compact = train_end.replace("-", "") if train_end else None
+
+    date_clauses = []
+    if start_compact:
+        date_clauses.append(f"r.race_date >= '{start_compact}'")
+    if end_compact:
+        date_clauses.append(f"r.race_date <= '{end_compact}'")
+    date_filter = (" AND " + " AND ".join(date_clauses)) if date_clauses else ""
+
     conn = sqlite3.connect(str(db_path))
 
     # kyoso_tokuten が補完済みのレースのみ対象
     # （補完されていない選手がいるレースは除外）
-    print(f"[{label}] データ読み込み中...")
+    print(f"[{label}] データ読み込み中 (期間: {train_start or '-'} 〜 {train_end or '-'})...")
     races_df = pd.read_sql_query(f"""
         SELECT DISTINCT r.*
         FROM races r
         WHERE r.is_midnight = {midnight_val}
+          {date_filter}
           AND NOT EXISTS (
             SELECT 1 FROM entries e
             WHERE e.race_id = r.race_id
@@ -79,6 +94,7 @@ def load_training_data(is_midnight: bool, db_path: Path = DB_PATH):
         SELECT e.* FROM entries e
         JOIN races r ON e.race_id = r.race_id
         WHERE r.is_midnight = {midnight_val}
+          {date_filter}
           AND e.kyoso_tokuten IS NOT NULL
     """, conn)
 
@@ -88,6 +104,7 @@ def load_training_data(is_midnight: bool, db_path: Path = DB_PATH):
         FROM results res
         JOIN races r ON res.race_id = r.race_id
         WHERE r.is_midnight = {midnight_val}
+          {date_filter}
           AND res.rank = 1
     """, conn)
     conn.close()
@@ -173,9 +190,17 @@ def load_training_data(is_midnight: bool, db_path: Path = DB_PATH):
     return X, y, dates, race_ids
 
 
-def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH):
+def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH,
+                       train_start: str = None, train_end: str = None,
+                       model_suffix: str = None):
     """
     モデルを学習し、Purged K-Fold CV で評価する。
+
+    Parameters:
+        is_midnight: モデル種別
+        train_start/train_end: 学習期間（省略時は全期間）
+        model_suffix: モデル保存ファイル名のサフィックス
+                       例: "2023" → stage1_normal_2023.pkl
     """
     label = "midnight" if is_midnight else "normal"
     label_ja = "ミッドナイト" if is_midnight else "通常"
@@ -186,7 +211,10 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH):
 
     t_start = time.time()
 
-    X, y, dates, race_ids = load_training_data(is_midnight, db_path)
+    X, y, dates, race_ids = load_training_data(
+        is_midnight, db_path,
+        train_start=train_start, train_end=train_end,
+    )
     if X is None:
         print(f"[{label_ja}] データなし。スキップ。")
         return
@@ -225,8 +253,11 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH):
     for feat, score in importance[:20]:
         print(f"  {feat}: {score:.1f}")
 
-    # モデル保存
-    model_path = MODEL_DIR / f"stage1_{label}.pkl"
+    # モデル保存（サフィックスがあれば stage1_{label}_{suffix}.pkl）
+    if model_suffix:
+        model_path = MODEL_DIR / f"stage1_{label}_{model_suffix}.pkl"
+    else:
+        model_path = MODEL_DIR / f"stage1_{label}.pkl"
     with open(model_path, "wb") as f:
         pickle.dump({
             "model": final_model,
@@ -235,6 +266,8 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH):
             "feature_names": FEATURE_NAMES,
             "n_train": len(X),
             "label": label,
+            "train_start": train_start,
+            "train_end": train_end,
         }, f)
     print(f"\nモデル保存: {model_path}")
 
@@ -250,19 +283,41 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH):
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Stage1 学習")
+    parser.add_argument("--train_start", type=str, default=None,
+                        help="学習開始日 YYYY-MM-DD（省略で全期間）")
+    parser.add_argument("--train_end", type=str, default=None,
+                        help="学習終了日 YYYY-MM-DD（省略で全期間）")
+    parser.add_argument("--model_suffix", type=str, default=None,
+                        help="モデルファイル名サフィックス "
+                             "（例: 2023 → stage1_normal_2023.pkl）")
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  競輪AI Stage1 学習")
+    print(f"  期間: {args.train_start or '-'} 〜 {args.train_end or '-'}")
+    if args.model_suffix:
+        print(f"  サフィックス: _{args.model_suffix}")
     print("=" * 60)
 
     results = []
 
     # 通常レースモデル
-    r = train_and_evaluate(is_midnight=False)
+    r = train_and_evaluate(
+        is_midnight=False,
+        train_start=args.train_start, train_end=args.train_end,
+        model_suffix=args.model_suffix,
+    )
     if r:
         results.append(r)
 
     # ミッドナイトモデル
-    r = train_and_evaluate(is_midnight=True)
+    r = train_and_evaluate(
+        is_midnight=True,
+        train_start=args.train_start, train_end=args.train_end,
+        model_suffix=args.model_suffix,
+    )
     if r:
         results.append(r)
 
