@@ -1214,6 +1214,286 @@ class ChariLotoScraper:
 
         logger.info("backfill_payout 完了: %d 件更新", updated_total)
 
+    # =========================================================
+    # 全券種払戻のバックフィル（v0.34）
+    # 対応券種（chariloto 取得可能）: 2枠連/2車単/2車複/3連単/3連複/ワイド
+    # 非対応: 単勝・複勝 (chariloto ページに存在しない)
+    # =========================================================
+
+    def _parse_payouts_all(self, html):
+        """
+        chariloto の結果ページから全券種の払戻を抽出する。
+
+        テーブル構造 (各レース 7 テーブル):
+          offset 0: 着順 (rider info, col '着' あり)
+          offset 1: 決着予想
+          offset 2: 予想スコア
+          offset 3: 2枠連 (col '2枠連')
+          offset 4: 2車連 (col '2車連') - 2車単('-') + 2車複('=')
+          offset 5: 3連勝 (col '3連勝') - 3連単('-') + 3連複('=')
+          offset 6: ワイド (col 'ワイド') - 3対
+
+        Returns:
+            dict: {race_no: {
+                "exacta": {"combo": "1-7", "payout": 1240} or None,
+                "quinella": {"combo": "1=7", "payout": 700} or None,
+                "frame_quinella": {...} or None,
+                "trio": {"combo": "1=2=7", "payout": 1100} or None,
+                "trifecta": {"combo": "1-7-2", "payout": 3170} or None,
+                "wide": [{"combo": "1=7", "payout": 210}, ...] (0〜3件),
+            }}
+        """
+        try:
+            dfs = pd.read_html(io.StringIO(html))
+        except Exception as e:
+            logger.debug("read_html 失敗: %s", e)
+            return {}
+
+        result = {}
+        race_no = 0
+        current = None
+
+        # パターン定義
+        pat_ord3 = re.compile(r"(\d+)-(\d+)-(\d+)\s+([\d,]+)\s*円")
+        pat_un3 = re.compile(r"(\d+)=(\d+)=(\d+)\s+([\d,]+)\s*円")
+        pat_ord2 = re.compile(r"(\d+)-(\d+)\s+([\d,]+)\s*円")
+        pat_un2 = re.compile(r"(\d+)=(\d+)\s+([\d,]+)\s*円")
+
+        for df in dfs:
+            cols = list(df.columns)
+            col_str = str(cols)
+
+            # 着順テーブル = レース境界
+            if "着" in col_str and df.shape[1] >= 8:
+                race_no += 1
+                current = {
+                    "exacta": None, "quinella": None,
+                    "frame_quinella": None,
+                    "trio": None, "trifecta": None,
+                    "wide": [],
+                }
+                result[race_no] = current
+                continue
+
+            if current is None:
+                continue
+
+            # 2枠連
+            if "2枠連" in col_str:
+                for _, row in df.iterrows():
+                    if df.shape[1] < 2:
+                        break
+                    text = str(row.iloc[1])
+                    m = pat_un2.search(text)
+                    if m and current["frame_quinella"] is None:
+                        current["frame_quinella"] = {
+                            "combo": f"{m.group(1)}={m.group(2)}",
+                            "payout": int(m.group(3).replace(",", "")),
+                        }
+                continue
+
+            # 2車連 (= 2車複, - 2車単)
+            if "2車連" in col_str:
+                for _, row in df.iterrows():
+                    if df.shape[1] < 2:
+                        break
+                    text = str(row.iloc[1])
+                    m = pat_un2.search(text)
+                    if m and current["quinella"] is None:
+                        current["quinella"] = {
+                            "combo": f"{m.group(1)}={m.group(2)}",
+                            "payout": int(m.group(3).replace(",", "")),
+                        }
+                    m = pat_ord2.search(text)
+                    if m and current["exacta"] is None:
+                        current["exacta"] = {
+                            "combo": f"{m.group(1)}-{m.group(2)}",
+                            "payout": int(m.group(3).replace(",", "")),
+                        }
+                continue
+
+            # 3連勝 (= 3連複, - 3連単)
+            if "3連勝" in col_str or "3連単" in col_str:
+                for _, row in df.iterrows():
+                    if df.shape[1] < 2:
+                        break
+                    text = str(row.iloc[1])
+                    m = pat_un3.search(text)
+                    if m and current["trio"] is None:
+                        current["trio"] = {
+                            "combo": f"{m.group(1)}={m.group(2)}={m.group(3)}",
+                            "payout": int(m.group(4).replace(",", "")),
+                        }
+                    m = pat_ord3.search(text)
+                    if m and current["trifecta"] is None:
+                        current["trifecta"] = {
+                            "combo": f"{m.group(1)}-{m.group(2)}-{m.group(3)}",
+                            "payout": int(m.group(4).replace(",", "")),
+                        }
+                continue
+
+            # ワイド（1セルに3対連結）
+            if "ワイド" in col_str:
+                all_text = " ".join(
+                    str(df.iloc[r, c]) for r in range(df.shape[0])
+                    for c in range(df.shape[1])
+                )
+                for m in pat_un2.finditer(all_text):
+                    combo = f"{m.group(1)}={m.group(2)}"
+                    payout = int(m.group(3).replace(",", ""))
+                    if len(current["wide"]) < 3:
+                        current["wide"].append({"combo": combo, "payout": payout})
+                continue
+
+        # 空レースを除外
+        return {rn: r for rn, r in result.items()
+                if any(r[k] for k in ("exacta", "quinella", "trio", "trifecta"))}
+
+    def backfill_payout_all(self, start_date=None, end_date=None):
+        """
+        全券種払戻をバックフィルする（chariloto 対応6券種）。
+
+        exacta_payout が NULL のレースを対象に、chariloto 結果ページから
+        2枠連/2車単/2車複/3連単/3連複/ワイド の全払戻を取得し results 表に UPDATE。
+        rank=1 行に集約保存。
+
+        既存 trifecta_payout は上書きしない（整合性のため既存値を優先）。
+
+        Parameters:
+            start_date/end_date: 対象日範囲（省略時は全期間）
+        """
+        import json
+        # 日付範囲
+        if start_date and end_date:
+            start_dt = self._parse_date(start_date)
+            end_dt = self._parse_date(end_date)
+            if start_dt is None or end_dt is None:
+                logger.error("日付パース失敗: %s, %s", start_date, end_date)
+                return
+            start_compact = start_dt.strftime("%Y%m%d")
+            end_compact = end_dt.strftime("%Y%m%d")
+        else:
+            start_compact = "00000000"
+            end_compact = "99999999"
+
+        # JKA フィルタ
+        jka_to_vid = {}
+        for info in BANK_MASTER.values():
+            vid = info.get("venue_id")
+            jka = info.get("jka_code")
+            if vid and jka:
+                jka_to_vid[jka] = int(vid)
+        if len(self.jyo_cds) == len(JKA_CODES):
+            target_vids = None
+        else:
+            target_vids = set()
+            for jka in self.jyo_cds:
+                vid = jka_to_vid.get(jka)
+                if vid is not None:
+                    target_vids.add(vid)
+            if not target_vids:
+                logger.warning("backfill_payout_all: 対象会場なし")
+                return
+
+        # exacta_payout IS NULL の日付+会場
+        conn = self._connect_db()
+        cur = conn.cursor()
+        base_sql = """
+            SELECT DISTINCT rc.race_date, rc.jyo_cd
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.rank = 1
+              AND r.exacta_payout IS NULL
+              AND rc.race_date >= ?
+              AND rc.race_date <= ?
+        """
+        params = [start_compact, end_compact]
+        if target_vids is not None:
+            placeholders = ",".join(["?"] * len(target_vids))
+            base_sql += f" AND rc.jyo_cd IN ({placeholders})"
+            params.extend(target_vids)
+        base_sql += " ORDER BY rc.race_date"
+        cur.execute(base_sql, params)
+        targets = cur.fetchall()
+        conn.close()
+
+        if not targets:
+            logger.info("backfill_payout_all: 対象なし")
+            return
+        logger.info("backfill_payout_all: %d 会場日を処理", len(targets))
+
+        vid_to_jka = {v: k for k, v in jka_to_vid.items()}
+        updated_total = 0
+
+        for i, (race_date, jyo_cd) in enumerate(targets, 1):
+            jka = vid_to_jka.get(int(jyo_cd))
+            if jka is None:
+                continue
+            try:
+                dt = datetime.strptime(race_date, "%Y%m%d")
+            except ValueError:
+                continue
+            date_str = dt.strftime("%Y-%m-%d")
+
+            url = f"{BASE_URL}/keirin/results/{jka}/{date_str}"
+            html = self._fetch_html(url)
+            if html is None:
+                self._polite_sleep()
+                continue
+
+            payouts = self._parse_payouts_all(html)
+            if not payouts:
+                self._polite_sleep()
+                continue
+
+            venue_id = JKA_TO_VENUE_ID.get(jka)
+            if venue_id is None:
+                continue
+            date_compact = dt.strftime("%Y%m%d")
+
+            conn = self._connect_db()
+            cur = conn.cursor()
+            n_upd = 0
+            for race_no, p in payouts.items():
+                race_id = f"{venue_id}_{date_compact}_{race_no:02d}"
+                wide_json = json.dumps(p["wide"], ensure_ascii=False) if p["wide"] else None
+                try:
+                    cur.execute("""
+                        UPDATE results
+                        SET frame_quinella_combo = ?, frame_quinella_payout = ?,
+                            exacta_combo = ?, exacta_payout = ?,
+                            quinella_combo = ?, quinella_payout = ?,
+                            trio_combo = ?, trio_payout = ?,
+                            wide_payouts = ?
+                        WHERE race_id = ? AND rank = 1
+                          AND exacta_payout IS NULL
+                    """, (
+                        (p["frame_quinella"] or {}).get("combo"),
+                        (p["frame_quinella"] or {}).get("payout"),
+                        (p["exacta"] or {}).get("combo"),
+                        (p["exacta"] or {}).get("payout"),
+                        (p["quinella"] or {}).get("combo"),
+                        (p["quinella"] or {}).get("payout"),
+                        (p["trio"] or {}).get("combo"),
+                        (p["trio"] or {}).get("payout"),
+                        wide_json,
+                        race_id,
+                    ))
+                    n_upd += cur.rowcount
+                except sqlite3.Error as e:
+                    logger.warning("UPDATE エラー %s: %s", race_id, e)
+            conn.commit()
+            conn.close()
+
+            if n_upd > 0:
+                updated_total += n_upd
+                logger.info("[%d/%d] %s jka=%s → %d 件更新",
+                            i, len(targets), date_str, jka, n_upd)
+
+            self._polite_sleep()
+
+        logger.info("backfill_payout_all 完了: %d 件更新", updated_total)
+
 
 # =========================================================
 # Kドリームズ補完スクレイパー
@@ -2202,6 +2482,8 @@ def main():
                              "（例: 2022-04-20,2023-08-26）")
     parser.add_argument("--backfill_agari", action="store_true",
                         help="agari_timeがNULLのレースの上がりタイムを再取得")
+    parser.add_argument("--backfill_payout_all", action="store_true",
+                        help="全券種（2枠連/2車単/2車複/3連単/3連複/ワイド）を取得")
     parser.add_argument("--backfill_payout", action="store_true",
                         help="trifecta_payoutがNULLのレースの3連単払戻を再取得")
     parser.add_argument("--race_info", type=str, default=None,
@@ -2261,6 +2543,14 @@ def main():
             db_path=args.db, delay=args.delay, jyo_cds=jyo_cds,
         )
         scraper.backfill_payout(args.start, args.end)
+        return
+
+    # 全券種払戻バックフィル
+    if args.backfill_payout_all:
+        scraper = ChariLotoScraper(
+            db_path=args.db, delay=args.delay, jyo_cds=jyo_cds,
+        )
+        scraper.backfill_payout_all(args.start, args.end)
         return
 
     # Kドリームズ補完モード
