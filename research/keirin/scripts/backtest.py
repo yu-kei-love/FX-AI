@@ -1467,7 +1467,15 @@ def main():
     parser.add_argument("--mode", type=str, default="both",
                         choices=["both", "normal", "midnight"],
                         help="対象モデル (both/normal/midnight)")
+    parser.add_argument("--test_year", type=str, default=None,
+                        help="テスト年 (YYYY) - TEST_START/ENDを当該年の範囲に上書き")
     args = parser.parse_args()
+
+    # --test_year でテスト期間を上書き（グローバル変数を更新）
+    global TEST_START, TEST_END
+    if args.test_year:
+        TEST_START = f"{args.test_year}0101"
+        TEST_END = f"{args.test_year}1231"
 
     if args.value_lite:
         mode_label = "（value-lite・data-leakなし）"
