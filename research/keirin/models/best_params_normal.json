@@ -1,0 +1,19 @@
+{
+  "best_value": 0.8098989448904633,
+  "best_params": {
+    "learning_rate": 0.015371764621580653,
+    "num_leaves": 123,
+    "max_depth": 4,
+    "min_child_samples": 35,
+    "feature_fraction": 0.9315149059053753,
+    "bagging_fraction": 0.6985932576644724,
+    "bagging_freq": 8,
+    "lambda_l1": 1.1687221319719003,
+    "lambda_l2": 8.923497898655576e-08,
+    "n_estimators": 957
+  },
+  "n_trials": 100,
+  "train_start": "2022-01-01",
+  "train_end": "2023-12-31",
+  "tuned_at": "2026-04-19T00:43:37.165907"
+}

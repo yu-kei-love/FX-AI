@@ -192,7 +192,8 @@ def load_training_data(is_midnight: bool, db_path: Path = DB_PATH,
 
 def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH,
                        train_start: str = None, train_end: str = None,
-                       model_suffix: str = None):
+                       model_suffix: str = None,
+                       use_tuned_params: bool = False):
     """
     モデルを学習し、Purged K-Fold CV で評価する。
 
@@ -201,9 +202,11 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH,
         train_start/train_end: 学習期間（省略時は全期間）
         model_suffix: モデル保存ファイル名のサフィックス
                        例: "2023" → stage1_normal_2023.pkl
+        use_tuned_params: True なら models/best_params_{label}.json を読む
     """
     label = "midnight" if is_midnight else "normal"
     label_ja = "ミッドナイト" if is_midnight else "通常"
+    tuned_label_arg = label if use_tuned_params else None
 
     print(f"\n{'='*60}")
     print(f"  {label_ja} モデル学習")
@@ -227,7 +230,7 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH,
         for fold_idx, (train_idx, test_idx) in enumerate(
             purged_kfold_cv(X, y, dates, n_splits=5, gap_days=7)
         ):
-            model = Stage1Model()
+            model = Stage1Model(tuned_label=tuned_label_arg)
             model.fit(X.iloc[train_idx], y.iloc[train_idx])
             y_pred = model.predict_proba(X.iloc[test_idx])
             auc = roc_auc_score(y.iloc[test_idx], y_pred)
@@ -244,7 +247,9 @@ def train_and_evaluate(is_midnight: bool, db_path: Path = DB_PATH,
 
     # 全データで最終学習
     print(f"\n[{label_ja}] 全データで最終学習...")
-    final_model = Stage1Model()
+    if use_tuned_params:
+        print(f"  [tuned params 使用] models/best_params_{label}.json")
+    final_model = Stage1Model(tuned_label=tuned_label_arg)
     final_model.fit(X, y)
 
     # 特徴量重要度
@@ -292,6 +297,8 @@ if __name__ == "__main__":
     parser.add_argument("--model_suffix", type=str, default=None,
                         help="モデルファイル名サフィックス "
                              "（例: 2023 → stage1_normal_2023.pkl）")
+    parser.add_argument("--use_tuned_params", action="store_true",
+                        help="models/best_params_*.json を LightGBM に適用")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -308,6 +315,7 @@ if __name__ == "__main__":
         is_midnight=False,
         train_start=args.train_start, train_end=args.train_end,
         model_suffix=args.model_suffix,
+        use_tuned_params=args.use_tuned_params,
     )
     if r:
         results.append(r)
@@ -317,6 +325,7 @@ if __name__ == "__main__":
         is_midnight=True,
         train_start=args.train_start, train_end=args.train_end,
         model_suffix=args.model_suffix,
+        use_tuned_params=args.use_tuned_params,
     )
     if r:
         results.append(r)

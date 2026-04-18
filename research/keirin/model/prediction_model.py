@@ -61,10 +61,35 @@ class Stage1Model:
         "verbose": -1,
     }
 
-    def __init__(self):
+    def __init__(self, tuned_params: dict = None, tuned_label: str = None):
+        """
+        Parameters:
+            tuned_params: LGBMClassifier に渡す override パラメータ
+                          （指定時は LGB_PARAMS より優先）
+            tuned_label: "normal"/"midnight" を指定すると
+                         models/best_params_{label}.json を自動読み込み
+        """
         if not _HAS_LGB or not _HAS_SKLEARN:
             raise ImportError("lightgbm と scikit-learn が必要です")
-        self.lgb_model = lgb.LGBMClassifier(**self.LGB_PARAMS)
+
+        # tuned_label 指定で JSON から読み込み
+        if tuned_label and not tuned_params:
+            import os
+            import json as _json
+            _here = os.path.dirname(os.path.abspath(__file__))
+            _json_path = os.path.join(
+                _here, "..", "models", f"best_params_{tuned_label}.json"
+            )
+            if os.path.exists(_json_path):
+                with open(_json_path, "r", encoding="utf-8") as _f:
+                    tuned_params = _json.load(_f).get("best_params", {})
+
+        # パラメータ決定: LGB_PARAMS + tuned_params (override)
+        lgb_params = dict(self.LGB_PARAMS)
+        if tuned_params:
+            lgb_params.update(tuned_params)
+        self._lgb_params_used = lgb_params
+        self.lgb_model = lgb.LGBMClassifier(**lgb_params)
         self.nn_model  = MLPClassifier(
             hidden_layer_sizes=(128, 64),
             max_iter=200,
