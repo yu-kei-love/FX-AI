@@ -17,6 +17,7 @@ import sqlite3
 import pickle
 import sys
 import time
+from itertools import permutations
 from pathlib import Path
 
 import numpy as np
@@ -636,6 +637,496 @@ def run_backtest_real(is_midnight: bool, db_path=DB_PATH,
     }
 
 
+# =========================================================================
+#  Value-based 買い目選定（v0.33）
+# =========================================================================
+
+def run_backtest_value(is_midnight: bool, db_path=DB_PATH,
+                       model_suffix: str = "2023",
+                       ev_threshold: float = 1.1,
+                       min_odds: int = 20,
+                       bet_amount: int = 100):
+    """
+    実オッズを使った value-based 買い目選定。
+
+    買い目選定:
+      1. 各レースの 全3連単 (N×(N-1)×(N-2) 通り) を列挙
+      2. combo_prob = p1 × p2/(1-p1) × p3/(1-p1-p2) （条件付き近似）
+      3. 実EV = combo_prob × (trifecta_payout / 100)
+      4. 購入条件:
+           ① 実EV > ev_threshold
+           ② trifecta_payout >= min_odds × 100（低オッズの本命は除外）
+
+    注意:
+      - trifecta_payout はレースの "当たり combo" の払戻のみ判明。
+        他 combo の真のオッズは未収集のため、当該レースの払戻を全 combo に
+        代入して近似している（retrospective 分析）。
+      - この分析結果はライブ運用の EV ではなく、「過去データで value が
+        あった combo を選択できていたか」の指標である。
+
+    感度分析:
+      min_odds: [10, 20, 30, 50, 100]
+      ev_threshold: [1.0, 1.1, 1.2]
+      の 5×3 = 15 通りの ROI を計算。
+    """
+    label = "midnight" if is_midnight else "normal"
+    label_ja = "ミッドナイト" if is_midnight else "通常"
+
+    print(f"\n{'='*60}")
+    print(f"  {label_ja} Value-based 実払戻バックテスト")
+    print(f"{'='*60}\n")
+
+    # モデル読み込み
+    if model_suffix:
+        model_path = MODEL_DIR / f"stage1_{label}_{model_suffix}.pkl"
+    else:
+        model_path = MODEL_DIR / f"stage1_{label}.pkl"
+    if not model_path.exists():
+        print(f"モデルなし: {model_path}")
+        return None
+    with open(model_path, "rb") as f:
+        model_data = pickle.load(f)
+    model = model_data["model"]
+    print(f"モデル: {model_path.name} (CV AUC={model_data.get('cv_mean_auc', 0):.4f})")
+
+    payout_df = load_payout_data(is_midnight, db_path)
+    print(f"払戻バックフィル済み: {len(payout_df):,}レース")
+    if len(payout_df) == 0:
+        return None
+
+    races_df, entries_df, results_df = load_test_data(is_midnight, db_path)
+    if races_df is None:
+        return None
+
+    payout_race_ids = set(payout_df["race_id"])
+    races_df = races_df[races_df["race_id"].isin(payout_race_ids)].reset_index(drop=True)
+    entries_df = entries_df[entries_df["race_id"].isin(payout_race_ids)].reset_index(drop=True)
+    print(f"[{label_ja}] 払戻あり & 特徴量対象: {len(races_df):,}レース")
+    if len(races_df) == 0:
+        return None
+
+    # 特徴量計算
+    print(f"[{label_ja}] 特徴量計算中...")
+    t0 = time.time()
+    features = compute_features(entries_df, races_df, db_path)
+    print(f"  特徴量計算完了: {time.time()-t0:.1f}秒, {len(features):,}行")
+
+    # 予測
+    X = features[FEATURE_NAMES].fillna(0)
+    features["pred_prob"] = model.predict_proba(X)
+
+    if "race_date" not in features.columns:
+        features = features.merge(
+            races_df[["race_id", "race_date"]], on="race_id", how="left"
+        )
+
+    # 払戻マップ
+    payout_map = {}
+    for _, row in payout_df.iterrows():
+        combo_str = row["trifecta_combo"]
+        payout = row["trifecta_payout"]
+        if pd.isna(combo_str) or pd.isna(payout):
+            continue
+        try:
+            combo_tuple = tuple(int(x) for x in str(combo_str).split("-"))
+        except ValueError:
+            continue
+        if len(combo_tuple) != 3:
+            continue
+        payout_map[row["race_id"]] = (combo_tuple, int(payout))
+
+    # 感度分析用 accumulator
+    min_odds_list = [10, 20, 30, 50, 100]
+    ev_threshold_list = [1.0, 1.1, 1.2]
+    sens = {
+        (mo, ev): {"n_bets": 0, "n_hits": 0,
+                   "total_bet": 0, "total_return": 0}
+        for mo in min_odds_list for ev in ev_threshold_list
+    }
+
+    # デフォルト（月別用）
+    monthly = {}
+
+    print(f"[{label_ja}] 全 combo 列挙中...")
+    t0 = time.time()
+    n_races_processed = 0
+    n_combos_evaluated = 0
+    n_passing_default = 0
+
+    for race_id, group in features.groupby("race_id"):
+        if race_id not in payout_map:
+            continue
+        actual_combo, actual_payout = payout_map[race_id]
+
+        car_list = [(int(r["car_no"]), float(r["pred_prob"]))
+                    for _, r in group.iterrows()]
+        if len(car_list) < 3:
+            continue
+
+        race_date = str(group.iloc[0].get("race_date", ""))
+        month = race_date[:6] if len(race_date) >= 6 else ""
+
+        n_races_processed += 1
+
+        # 全 3連単 permutation
+        for (c1, p1), (c2, p2), (c3, p3) in permutations(car_list, 3):
+            n_combos_evaluated += 1
+            denom2 = 1 - p1
+            if denom2 <= 0:
+                continue
+            denom3 = 1 - p1 - p2
+            if denom3 <= 0:
+                continue
+            combo_prob = p1 * (p2 / denom2) * (p3 / denom3)
+            real_ev = combo_prob * actual_payout / 100.0
+            combo = (c1, c2, c3)
+            hit = (combo == actual_combo)
+            return_amt = actual_payout if hit else 0
+
+            # 感度分析 15通り
+            for mo in min_odds_list:
+                if actual_payout < mo * 100:
+                    continue
+                for ev in ev_threshold_list:
+                    if real_ev > ev:
+                        s = sens[(mo, ev)]
+                        s["n_bets"] += 1
+                        s["total_bet"] += bet_amount
+                        if hit:
+                            s["n_hits"] += 1
+                            s["total_return"] += return_amt
+
+            # 月別（ユーザ指定閾値で）
+            if actual_payout >= min_odds * 100 and real_ev > ev_threshold:
+                n_passing_default += 1
+                if month not in monthly:
+                    monthly[month] = {"n_bets": 0, "n_hits": 0,
+                                      "total_bet": 0, "total_return": 0}
+                m = monthly[month]
+                m["n_bets"] += 1
+                m["total_bet"] += bet_amount
+                if hit:
+                    m["n_hits"] += 1
+                    m["total_return"] += return_amt
+
+    elapsed = time.time() - t0
+    print(f"  列挙完了: {elapsed:.1f}秒")
+    print(f"  対象レース: {n_races_processed:,}")
+    print(f"  評価 combo: {n_combos_evaluated:,}")
+    print(f"  デフォルト条件通過: {n_passing_default:,}")
+
+    # === 感度分析 matrix ===
+    print(f"\n=== {label_ja} 感度分析: ROI (%) ===")
+    header = "min_odds\\EV"
+    print(f"  {header:>12}  " +
+          "  ".join(f"{ev:>8}" for ev in ev_threshold_list))
+    for mo in min_odds_list:
+        row_vals = []
+        for ev in ev_threshold_list:
+            s = sens[(mo, ev)]
+            if s["total_bet"] > 0:
+                roi = (s["total_return"] / s["total_bet"] - 1) * 100
+                row_vals.append(f"{roi:+7.2f}%")
+            else:
+                row_vals.append("      -")
+        print(f"  {mo:>10}倍  " + "  ".join(f"{v:>8}" for v in row_vals))
+
+    # n_bets matrix
+    print(f"\n=== {label_ja} 感度分析: 購入点数 ===")
+    header = "min_odds\\EV"
+    print(f"  {header:>12}  " +
+          "  ".join(f"{ev:>8}" for ev in ev_threshold_list))
+    for mo in min_odds_list:
+        row_vals = []
+        for ev in ev_threshold_list:
+            s = sens[(mo, ev)]
+            row_vals.append(f"{s['n_bets']:,}")
+        print(f"  {mo:>10}倍  " + "  ".join(f"{v:>8}" for v in row_vals))
+
+    # 的中率 matrix
+    print(f"\n=== {label_ja} 感度分析: 的中率 ===")
+    header = "min_odds\\EV"
+    print(f"  {header:>12}  " +
+          "  ".join(f"{ev:>8}" for ev in ev_threshold_list))
+    for mo in min_odds_list:
+        row_vals = []
+        for ev in ev_threshold_list:
+            s = sens[(mo, ev)]
+            if s["n_bets"] > 0:
+                hr = s["n_hits"] / s["n_bets"] * 100
+                row_vals.append(f"{hr:.2f}%")
+            else:
+                row_vals.append("-")
+        print(f"  {mo:>10}倍  " + "  ".join(f"{v:>8}" for v in row_vals))
+
+    # === 月別 ROI（デフォルト条件） ===
+    print(f"\n=== {label_ja} 月別 実ROI "
+          f"(min_odds >= {min_odds}, EV > {ev_threshold}) ===")
+    print(f"  {'月':>7}  {'購入':>7}  {'的中':>6}  {'的中率':>7}  "
+          f"{'投資':>11}  {'払戻':>11}  {'ROI':>9}")
+    monthly_sorted = sorted(monthly.items())
+    for month, m in monthly_sorted:
+        roi = (m["total_return"] / m["total_bet"] - 1) * 100 if m["total_bet"] > 0 else 0
+        hr = m["n_hits"] / m["n_bets"] * 100 if m["n_bets"] > 0 else 0
+        print(f"  {month:>7}  {m['n_bets']:>7,}  {m['n_hits']:>6,}  "
+              f"{hr:>6.2f}%  {m['total_bet']:>10,}円  "
+              f"{m['total_return']:>10,}円  {roi:>+7.2f}%")
+
+    # 総合
+    default_stats = sens[(min_odds, ev_threshold)]
+    total_bet = default_stats["total_bet"]
+    total_return = default_stats["total_return"]
+    profit = total_return - total_bet
+    roi = (total_return / total_bet - 1) * 100 if total_bet > 0 else 0
+    print(f"\n=== {label_ja} 総合 "
+          f"(min_odds >= {min_odds}, EV > {ev_threshold}) ===")
+    print(f"  総投資額: {total_bet:,}円")
+    print(f"  総払戻額: {total_return:,}円")
+    print(f"  収支:     {profit:+,}円")
+    print(f"  ROI:      {roi:+.2f}%")
+    print(f"  的中率:    {default_stats['n_hits']/default_stats['n_bets']*100:.2f}%" if default_stats["n_bets"] else "")
+
+    return {
+        "label": label,
+        "n_races": n_races_processed,
+        "sensitivity": sens,
+        "monthly": [{"month": m, **v} for m, v in monthly_sorted],
+        "total_bet": total_bet,
+        "total_return": total_return,
+        "profit": profit,
+        "roi": roi,
+    }
+
+
+# =========================================================================
+#  Value-lite 買い目選定（v0.33, data-leak なし）
+# =========================================================================
+
+def run_backtest_value_lite(is_midnight: bool, db_path=DB_PATH,
+                            model_suffix: str = "2023",
+                            prob_threshold: float = 0.02,
+                            bet_amount: int = 100):
+    """
+    data-leak なしの value-lite 買い目選定。
+
+    買い目選定（レース前情報のみ使用）:
+      - 全3連単 combo を列挙
+      - combo_prob = p1 × p2/(1-p1) × p3/(1-p1-p2) を計算
+      - combo_prob > prob_threshold の combo を購入
+
+    return 計算（レース後情報を使用）:
+      - combo == actual_combo のとき: return = results.trifecta_payout
+      - 不一致: return = 0
+      - actual_payout は買い目決定ロジックに一切使わない
+
+    data-leak 検証:
+      - purchase decision は combo_prob（モデル予測のみ）に依存
+      - prob_threshold は事前に定義した定数
+      - レース後情報 (actual_combo, actual_payout) は return 額算出のみに使用
+      - レース毎の EV 計算・fliter でレース後情報を参照していない
+    """
+    label = "midnight" if is_midnight else "normal"
+    label_ja = "ミッドナイト" if is_midnight else "通常"
+
+    print(f"\n{'='*60}")
+    print(f"  {label_ja} Value-lite バックテスト (data-leak なし)")
+    print(f"{'='*60}\n")
+
+    # モデル読み込み
+    if model_suffix:
+        model_path = MODEL_DIR / f"stage1_{label}_{model_suffix}.pkl"
+    else:
+        model_path = MODEL_DIR / f"stage1_{label}.pkl"
+    if not model_path.exists():
+        print(f"モデルなし: {model_path}")
+        return None
+    with open(model_path, "rb") as f:
+        model_data = pickle.load(f)
+    model = model_data["model"]
+    print(f"モデル: {model_path.name} (CV AUC={model_data.get('cv_mean_auc', 0):.4f})")
+
+    payout_df = load_payout_data(is_midnight, db_path)
+    print(f"払戻バックフィル済み: {len(payout_df):,}レース")
+    if len(payout_df) == 0:
+        return None
+
+    races_df, entries_df, results_df = load_test_data(is_midnight, db_path)
+    if races_df is None:
+        return None
+
+    payout_race_ids = set(payout_df["race_id"])
+    races_df = races_df[races_df["race_id"].isin(payout_race_ids)].reset_index(drop=True)
+    entries_df = entries_df[entries_df["race_id"].isin(payout_race_ids)].reset_index(drop=True)
+    print(f"[{label_ja}] 払戻あり & 特徴量対象: {len(races_df):,}レース")
+    if len(races_df) == 0:
+        return None
+
+    print(f"[{label_ja}] 特徴量計算中...")
+    t0 = time.time()
+    features = compute_features(entries_df, races_df, db_path)
+    print(f"  特徴量計算完了: {time.time()-t0:.1f}秒, {len(features):,}行")
+
+    X = features[FEATURE_NAMES].fillna(0)
+    features["pred_prob"] = model.predict_proba(X)
+
+    if "race_date" not in features.columns:
+        features = features.merge(
+            races_df[["race_id", "race_date"]], on="race_id", how="left"
+        )
+
+    # 払戻マップ
+    payout_map = {}
+    for _, row in payout_df.iterrows():
+        combo_str = row["trifecta_combo"]
+        payout = row["trifecta_payout"]
+        if pd.isna(combo_str) or pd.isna(payout):
+            continue
+        try:
+            combo_tuple = tuple(int(x) for x in str(combo_str).split("-"))
+        except ValueError:
+            continue
+        if len(combo_tuple) != 3:
+            continue
+        payout_map[row["race_id"]] = (combo_tuple, int(payout))
+
+    # 感度分析用 accumulator
+    threshold_list = [0.005, 0.01, 0.02, 0.03, 0.05, 0.1]
+    sens = {
+        th: {"n_bets": 0, "n_hits": 0, "total_bet": 0, "total_return": 0}
+        for th in threshold_list
+    }
+
+    # デフォルト閾値での月別
+    monthly = {}
+
+    print(f"[{label_ja}] 全 combo 列挙・評価中...")
+    t0 = time.time()
+    n_races = 0
+    n_combos = 0
+
+    for race_id, group in features.groupby("race_id"):
+        if race_id not in payout_map:
+            continue
+        actual_combo, actual_payout = payout_map[race_id]
+
+        car_list = [(int(r["car_no"]), float(r["pred_prob"]))
+                    for _, r in group.iterrows()]
+        if len(car_list) < 3:
+            continue
+
+        race_date = str(group.iloc[0].get("race_date", ""))
+        month = race_date[:6] if len(race_date) >= 6 else ""
+        n_races += 1
+
+        for (c1, p1), (c2, p2), (c3, p3) in permutations(car_list, 3):
+            n_combos += 1
+            denom2 = 1 - p1
+            if denom2 <= 0:
+                continue
+            denom3 = 1 - p1 - p2
+            if denom3 <= 0:
+                continue
+            combo_prob = p1 * (p2 / denom2) * (p3 / denom3)
+            combo = (c1, c2, c3)
+            hit = (combo == actual_combo)
+            return_amt = actual_payout if hit else 0
+
+            # ---- 感度分析（combo_prob 閾値のみ使用、actual_payout 不使用）
+            for th in threshold_list:
+                if combo_prob > th:
+                    s = sens[th]
+                    s["n_bets"] += 1
+                    s["total_bet"] += bet_amount
+                    if hit:
+                        s["n_hits"] += 1
+                        s["total_return"] += return_amt
+
+            # ---- 月別（デフォルト閾値）
+            if combo_prob > prob_threshold:
+                if month not in monthly:
+                    monthly[month] = {"n_bets": 0, "n_hits": 0,
+                                      "total_bet": 0, "total_return": 0}
+                m = monthly[month]
+                m["n_bets"] += 1
+                m["total_bet"] += bet_amount
+                if hit:
+                    m["n_hits"] += 1
+                    m["total_return"] += return_amt
+
+    elapsed = time.time() - t0
+    print(f"  評価完了: {elapsed:.1f}秒")
+    print(f"  対象レース: {n_races:,}")
+    print(f"  評価 combo: {n_combos:,}")
+
+    # === 感度分析 ===
+    print(f"\n=== {label_ja} 感度分析 (prob_threshold) ===")
+    print(f"  {'prob_th':>8}  {'購入':>10}  {'的中':>6}  {'的中率':>7}  "
+          f"{'投資':>13}  {'払戻':>13}  {'ROI':>9}  {'hit平均倍率':>12}")
+    best_roi = -9999
+    best_th = None
+    for th in threshold_list:
+        s = sens[th]
+        if s["total_bet"] == 0:
+            print(f"  {th:>8.3f}  {'-':>10}  {'-':>6}  {'-':>7}  "
+                  f"{'-':>13}  {'-':>13}  {'-':>9}  {'-':>12}")
+            continue
+        roi = (s["total_return"] / s["total_bet"] - 1) * 100
+        hit_rate = s["n_hits"] / s["n_bets"] * 100 if s["n_bets"] > 0 else 0
+        # hit平均倍率 = 払戻合計 / 的中数 / bet_amount
+        hit_avg_odds = (s["total_return"] / s["n_hits"] / bet_amount) if s["n_hits"] > 0 else 0
+        print(f"  {th:>8.3f}  {s['n_bets']:>10,}  {s['n_hits']:>6,}  "
+              f"{hit_rate:>6.2f}%  {s['total_bet']:>12,}円  "
+              f"{s['total_return']:>12,}円  {roi:>+7.2f}%  "
+              f"{hit_avg_odds:>9.1f}倍")
+        if roi > best_roi:
+            best_roi = roi
+            best_th = th
+
+    # === 月別（デフォルト閾値） ===
+    print(f"\n=== {label_ja} 月別 実ROI (prob_threshold > {prob_threshold}) ===")
+    print(f"  {'月':>7}  {'購入':>8}  {'的中':>6}  {'的中率':>7}  "
+          f"{'投資':>11}  {'払戻':>11}  {'ROI':>9}")
+    monthly_sorted = sorted(monthly.items())
+    for month, m in monthly_sorted:
+        roi = (m["total_return"] / m["total_bet"] - 1) * 100 if m["total_bet"] > 0 else 0
+        hr = m["n_hits"] / m["n_bets"] * 100 if m["n_bets"] > 0 else 0
+        print(f"  {month:>7}  {m['n_bets']:>8,}  {m['n_hits']:>6,}  "
+              f"{hr:>6.2f}%  {m['total_bet']:>10,}円  "
+              f"{m['total_return']:>10,}円  {roi:>+7.2f}%")
+
+    # 総合
+    default_stats = sens[prob_threshold] if prob_threshold in sens else {
+        "total_bet": 0, "total_return": 0, "n_bets": 0, "n_hits": 0,
+    }
+    tot_bet = default_stats["total_bet"]
+    tot_ret = default_stats["total_return"]
+    profit = tot_ret - tot_bet
+    roi = (tot_ret / tot_bet - 1) * 100 if tot_bet > 0 else 0
+    print(f"\n=== {label_ja} 総合 (prob_threshold > {prob_threshold}) ===")
+    print(f"  総投資額: {tot_bet:,}円")
+    print(f"  総払戻額: {tot_ret:,}円")
+    print(f"  収支:     {profit:+,}円")
+    print(f"  ROI:      {roi:+.2f}%")
+    if default_stats["n_hits"] > 0:
+        hit_avg = default_stats["total_return"] / default_stats["n_hits"] / bet_amount
+        print(f"  hit平均倍率: {hit_avg:.1f}倍 (市場平均 133.7倍)")
+    if best_th is not None:
+        print(f"  最良ROI 閾値: prob_threshold = {best_th} で ROI={best_roi:+.2f}%")
+
+    return {
+        "label": label,
+        "n_races": n_races,
+        "sensitivity": sens,
+        "monthly": [{"month": m, **v} for m, v in monthly_sorted],
+        "total_bet": tot_bet,
+        "total_return": tot_ret,
+        "profit": profit,
+        "roi": roi,
+        "best_threshold": best_th,
+        "best_roi": best_roi,
+    }
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Stage1 バックテスト")
@@ -644,22 +1135,40 @@ def main():
                              "（例: 2023 → stage1_*_2023.pkl を使用）")
     parser.add_argument("--real", action="store_true",
                         help="実払戻金でROIを計算 (results.trifecta_payout 使用)")
+    parser.add_argument("--value", action="store_true",
+                        help="[廃止推奨・data-leakあり] value-based (actual_payout でEV)")
+    parser.add_argument("--value_lite", action="store_true",
+                        help="value-lite (data-leakなし・combo_prob閾値)")
+    parser.add_argument("--prob_threshold", type=float, default=0.02,
+                        help="value-lite の combo_prob 閾値 (デフォルト: 0.02)")
     parser.add_argument("--ev_threshold", type=float, default=1.1,
-                        help="月別ROI計算に使うEV閾値 (デフォルト: 1.1)")
+                        help="EV閾値 (デフォルト: 1.1)")
+    parser.add_argument("--min_odds", type=int, default=20,
+                        help="最低オッズ倍率 (value モード時, デフォルト: 20)")
     parser.add_argument("--mode", type=str, default="both",
                         choices=["both", "normal", "midnight"],
                         help="対象モデル (both/normal/midnight)")
     args = parser.parse_args()
 
+    if args.value_lite:
+        mode_label = "（value-lite・data-leakなし）"
+    elif args.value:
+        mode_label = "（value-based・data-leakあり）"
+    elif args.real:
+        mode_label = "（実払戻版）"
+    else:
+        mode_label = "（理論ROI版）"
     print("=" * 60)
-    print("  競輪AI バックテスト" + ("（実払戻版）" if args.real else "（理論ROI版）"))
+    print("  競輪AI バックテスト" + mode_label)
     print("=" * 60)
     print(f"  テスト期間: {TEST_START} 〜 {TEST_END}")
     if args.model_suffix:
         print(f"  モデル: stage1_*_{args.model_suffix}.pkl")
     else:
         print(f"  モデル: stage1_*.pkl (全期間学習・データリーク注意)")
-    if args.real:
+    if args.value:
+        print(f"  min_odds: {args.min_odds}倍, EV閾値: {args.ev_threshold}")
+    elif args.real:
         print(f"  EV閾値(月別): {args.ev_threshold}")
     print()
 
@@ -669,6 +1178,71 @@ def main():
         targets.append(False)
     if args.mode in ("both", "midnight"):
         targets.append(True)
+
+    if args.value_lite:
+        # Value-lite バックテスト（data-leak なし）
+        for is_mid in targets:
+            r = run_backtest_value_lite(
+                is_midnight=is_mid,
+                model_suffix=args.model_suffix,
+                prob_threshold=args.prob_threshold,
+            )
+            if r:
+                results.append(r)
+
+        if results:
+            print("\n" + "=" * 60)
+            print("  Value-lite バックテスト 全体サマリ")
+            print("=" * 60)
+            total_bet = sum(r["total_bet"] for r in results)
+            total_return = sum(r["total_return"] for r in results)
+            profit = total_return - total_bet
+            roi = (total_return / total_bet - 1) * 100 if total_bet > 0 else 0
+            for r in results:
+                bst = r.get("best_threshold")
+                bstr = r.get("best_roi", 0)
+                print(f"  {r['label']}: "
+                      f"投資 {r['total_bet']:>10,}円, "
+                      f"払戻 {r['total_return']:>10,}円, "
+                      f"ROI {r['roi']:+7.2f}% (n_races={r['n_races']:,})"
+                      f"  最良閾値={bst} ROI={bstr:+7.2f}%")
+            print(f"  --- 合計 (prob_threshold > {args.prob_threshold}) ---")
+            print(f"  総投資: {total_bet:,}円  総払戻: {total_return:,}円")
+            print(f"  収支:   {profit:+,}円  ROI: {roi:+.2f}%")
+            print("=" * 60)
+        return
+
+    if args.value:
+        # Value-based バックテスト
+        for is_mid in targets:
+            r = run_backtest_value(
+                is_midnight=is_mid,
+                model_suffix=args.model_suffix,
+                ev_threshold=args.ev_threshold,
+                min_odds=args.min_odds,
+            )
+            if r:
+                results.append(r)
+
+        # 全体サマリ
+        if results:
+            print("\n" + "=" * 60)
+            print("  Value-based バックテスト 全体サマリ")
+            print("=" * 60)
+            total_bet = sum(r["total_bet"] for r in results)
+            total_return = sum(r["total_return"] for r in results)
+            profit = total_return - total_bet
+            roi = (total_return / total_bet - 1) * 100 if total_bet > 0 else 0
+            for r in results:
+                print(f"  {r['label']}: "
+                      f"投資 {r['total_bet']:>10,}円, "
+                      f"払戻 {r['total_return']:>10,}円, "
+                      f"ROI {r['roi']:+7.2f}% (n_races={r['n_races']:,})")
+            print(f"  --- 合計 (min_odds>={args.min_odds}, EV>{args.ev_threshold}) ---")
+            print(f"  総投資: {total_bet:,}円  総払戻: {total_return:,}円")
+            print(f"  収支:   {profit:+,}円  ROI: {roi:+.2f}%")
+            print("=" * 60)
+        return
 
     if args.real:
         # 実払戻バックテスト
