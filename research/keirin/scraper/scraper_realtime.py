@@ -22,15 +22,33 @@
 # ===========================================
 
 import argparse
+import io
 import logging
 import re
 import sqlite3
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 import requests
+
+# bank_master を data/ から読み込み
+_SCRAPER_DIR = Path(__file__).resolve().parent
+_DATA_DIR = _SCRAPER_DIR.parent / "data"
+if str(_DATA_DIR) not in sys.path:
+    sys.path.insert(0, str(_DATA_DIR))
+try:
+    from bank_master import BANK_MASTER  # noqa: E402
+    JKA_TO_VENUE_ID = {
+        info["jka_code"]: info["venue_id"]
+        for info in BANK_MASTER.values()
+        if info.get("jka_code")
+    }
+except ImportError:
+    BANK_MASTER = {}
+    JKA_TO_VENUE_ID = {}
 
 # ログ設定
 logging.basicConfig(
@@ -177,6 +195,104 @@ class RealtimeScraper:
     # chariloto DB からの当日レース取得
     # =========================================================
 
+    def _fetch_and_register_today_races(self, date_str=None):
+        """
+        Kドリームズの当日開催カード /racecard/{YYYY}/{MM}/{DD}/ から
+        当日の開催レースを取得し、races テーブルに最小情報で登録する。
+
+        既存の race_id は上書きしない（ON CONFLICT DO NOTHING）。
+
+        Parameters:
+            date_str: "YYYYMMDD" 形式（省略時は当日）
+
+        Returns:
+            int: 新規登録件数
+        """
+        if date_str is None:
+            date_str = datetime.now().strftime("%Y%m%d")
+        try:
+            dt = datetime.strptime(date_str, "%Y%m%d")
+        except ValueError:
+            logger.error("日付パース失敗: %s", date_str)
+            return 0
+
+        if not JKA_TO_VENUE_ID:
+            logger.warning("JKA_TO_VENUE_ID 未ロード（bank_master インポート失敗）")
+            return 0
+
+        url = f"{BASE_URL}/racecard/{dt:%Y}/{dt:%m}/{dt:%d}/"
+        logger.info("当日開催カード取得: %s", url)
+        html = self._fetch_html(url)
+        if html is None:
+            logger.warning("当日開催カード取得失敗")
+            return 0
+
+        # /{venue_romaji}/racedetail/{16桁race_id} を抽出
+        # race_id_kd = JKA(2) + 初日YYYYMMDD(8) + 日数(2) + race_no(4)
+        pattern = re.compile(r"/([a-z_]+)/racedetail/(\d{16})")
+        matches = sorted(set(pattern.findall(html)))
+
+        # 抽出したレースを (jka, race_no) のユニークセットに整理
+        race_entries = []
+        seen = set()
+        for venue_romaji, race_id_kd in matches:
+            if venue_romaji in ("racecard", "sp", "pc", "css", "js",
+                                "images", "img"):
+                continue
+            jka = race_id_kd[:2]
+            try:
+                race_no = int(race_id_kd[-4:])
+            except ValueError:
+                continue
+            # 当日開催か（race_id_kd 内の日付 == date_str）は
+            # 簡易: venue_id が引ければ登録
+            venue_id = JKA_TO_VENUE_ID.get(jka)
+            if venue_id is None:
+                continue
+            key = (jka, race_no)
+            if key in seen:
+                continue
+            seen.add(key)
+            race_entries.append({
+                "jka": jka,
+                "venue_id": int(venue_id),
+                "race_no": race_no,
+            })
+
+        if not race_entries:
+            logger.info("当日開催レースが抽出されませんでした")
+            return 0
+
+        logger.info("当日開催レース候補: %d 件", len(race_entries))
+
+        conn = sqlite3.connect(str(self.db_path))
+        cur = conn.cursor()
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        inserted = 0
+        for e in race_entries:
+            race_id = f"{e['venue_id']:02d}_{date_str}_{e['race_no']:02d}"
+            # is_midnight はレース番号 >= 8 を簡易ヒューリスティック
+            # (厳密には race_info 補完で確定させる)
+            is_midnight = 1 if e["race_no"] >= 8 else 0
+            try:
+                cur.execute("""
+                    INSERT INTO races
+                        (race_id, jyo_cd, race_date, race_no,
+                         is_midnight, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(race_id) DO NOTHING
+                """, (race_id, e["venue_id"], date_str, e["race_no"],
+                      is_midnight, now_iso))
+                if cur.rowcount > 0:
+                    inserted += 1
+            except sqlite3.Error as ex:
+                logger.warning("races INSERT エラー %s: %s", race_id, ex)
+
+        conn.commit()
+        conn.close()
+        logger.info("当日 races 新規登録: %d 件", inserted)
+        return inserted
+
     def _get_today_races(self):
         """
         当日のレース一覧をchariloto DBから取得する。
@@ -292,9 +408,12 @@ class RealtimeScraper:
             return []
 
         try:
-            dfs = pd.read_html(html)
+            dfs = pd.read_html(io.StringIO(html))
         except ValueError:
             logger.debug("テーブルなし: %s", url)
+            return []
+        except Exception as e:
+            logger.debug("read_html 失敗 %s: %s", url, e)
             return []
 
         if not dfs:
@@ -534,8 +653,13 @@ class RealtimeScraper:
     def scrape_all_active_races(self):
         """
         当日開催中の全レースを対象にオッズスナップショットを取得する。
-        chariloto DBのracesテーブルから当日レースを特定。
+        先に Kドリームズから当日開催カードを取得して races テーブルに登録し、
+        その後オッズ収集に入る。
         """
+        # 当日レースを races に登録（既存はスキップ）
+        self._fetch_and_register_today_races()
+        self._polite_sleep()
+
         races = self._get_today_races()
         if not races:
             logger.info("当日のレースが DB に見つかりません")
