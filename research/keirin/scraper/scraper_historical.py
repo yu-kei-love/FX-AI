@@ -1028,6 +1028,192 @@ class ChariLotoScraper:
 
         logger.info("backfill_agari 完了: %d 件更新", updated_total)
 
+    # =========================================================
+    # 3連単払戻のバックフィル
+    # =========================================================
+
+    def _parse_payouts(self, html):
+        """
+        結果ページのHTMLから各レースの3連単払戻を取得する。
+
+        テーブル構造（chariloto 確認済み）:
+          各レースに 2車連・3連単(3連勝)・ワイド の3テーブルが並ぶ
+          3連単テーブルは「3連勝」または「3連単」をカラム名に含む
+          「単」の行の2列目が「3-1-4 17,640円」形式
+
+        Returns:
+            dict: {race_no: {"combo": (1st, 2nd, 3rd), "payout": int}}
+        """
+        try:
+            dfs = pd.read_html(io.StringIO(html))
+        except Exception as e:
+            logger.debug("read_html 失敗: %s", e)
+            return {}
+
+        result = {}
+        race_no = 0
+        for df in dfs:
+            cols = list(df.columns)
+            col_str = str(cols)
+            # 3連単テーブルか判定
+            if "3連勝" not in col_str and "3連単" not in col_str:
+                continue
+            race_no += 1
+
+            # 「単」行を探して払戻を抽出
+            for _, row in df.iterrows():
+                first_cell = str(row.iloc[0]).strip()
+                if first_cell != "単":
+                    continue
+                text = str(row.iloc[1])
+                # "3-1-4 17,640円" 形式
+                m = re.match(
+                    r"\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\s+([\d,]+)\s*円",
+                    text,
+                )
+                if m:
+                    combo = (int(m.group(1)), int(m.group(2)),
+                             int(m.group(3)))
+                    payout = int(m.group(4).replace(",", ""))
+                    result[race_no] = {"combo": combo, "payout": payout}
+                break
+
+        return result
+
+    def backfill_payout(self, start_date=None, end_date=None):
+        """
+        trifecta_payout が NULL のレースの3連単払戻を再取得する。
+
+        既存の race_id を chariloto から再取得して results テーブルの
+        rank=1 行に trifecta_payout/combo を UPDATE する。
+
+        Parameters:
+            start_date: 開始日（省略時は全期間）
+            end_date:   終了日（省略時は全期間）
+        """
+        # 日付範囲
+        if start_date and end_date:
+            start_dt = self._parse_date(start_date)
+            end_dt = self._parse_date(end_date)
+            if start_dt is None or end_dt is None:
+                logger.error("日付パース失敗: %s, %s", start_date, end_date)
+                return
+            start_compact = start_dt.strftime("%Y%m%d")
+            end_compact = end_dt.strftime("%Y%m%d")
+        else:
+            start_compact = "00000000"
+            end_compact = "99999999"
+
+        # JKA フィルタ
+        jka_to_vid = {}
+        for info in BANK_MASTER.values():
+            vid = info.get("venue_id")
+            jka = info.get("jka_code")
+            if vid and jka:
+                jka_to_vid[jka] = int(vid)
+        if len(self.jyo_cds) == len(JKA_CODES):
+            target_vids = None
+        else:
+            target_vids = set()
+            for jka in self.jyo_cds:
+                vid = jka_to_vid.get(jka)
+                if vid is not None:
+                    target_vids.add(vid)
+            if not target_vids:
+                logger.warning("backfill_payout: 対象会場なし")
+                return
+
+        # trifecta_payout IS NULL の日付+会場を取得
+        conn = self._connect_db()
+        cur = conn.cursor()
+        base_sql = """
+            SELECT DISTINCT rc.race_date, rc.jyo_cd
+            FROM results r
+            JOIN races rc ON r.race_id = rc.race_id
+            WHERE r.rank = 1
+              AND r.trifecta_payout IS NULL
+              AND rc.race_date >= ?
+              AND rc.race_date <= ?
+        """
+        params = [start_compact, end_compact]
+        if target_vids is not None:
+            placeholders = ",".join(["?"] * len(target_vids))
+            base_sql += f" AND rc.jyo_cd IN ({placeholders})"
+            params.extend(target_vids)
+        base_sql += " ORDER BY rc.race_date"
+        cur.execute(base_sql, params)
+        targets = cur.fetchall()
+        conn.close()
+
+        if not targets:
+            logger.info("backfill_payout: 対象なし")
+            return
+
+        logger.info("backfill_payout: %d 会場日を処理", len(targets))
+
+        vid_to_jka = {v: k for k, v in jka_to_vid.items()}
+
+        updated_total = 0
+        for i, (race_date, jyo_cd) in enumerate(targets, 1):
+            jka = vid_to_jka.get(int(jyo_cd))
+            if jka is None:
+                continue
+
+            try:
+                dt = datetime.strptime(race_date, "%Y%m%d")
+            except ValueError:
+                continue
+            date_str = dt.strftime("%Y-%m-%d")
+
+            url = f"{BASE_URL}/keirin/results/{jka}/{date_str}"
+            html = self._fetch_html(url)
+            if html is None:
+                self._polite_sleep()
+                continue
+
+            payouts = self._parse_payouts(html)
+            if not payouts:
+                self._polite_sleep()
+                continue
+
+            # venue_id 取得
+            venue_id = JKA_TO_VENUE_ID.get(jka)
+            if venue_id is None:
+                continue
+
+            date_compact = dt.strftime("%Y%m%d")
+
+            # DB更新: rank=1 の行に trifecta_payout/combo を記録
+            conn = self._connect_db()
+            cur = conn.cursor()
+            n_updated = 0
+            for race_no, p in payouts.items():
+                race_id = f"{venue_id}_{date_compact}_{race_no:02d}"
+                combo = p["combo"]
+                combo_str = f"{combo[0]}-{combo[1]}-{combo[2]}"
+                payout = p["payout"]
+                try:
+                    cur.execute("""
+                        UPDATE results
+                        SET trifecta_payout = ?, trifecta_combo = ?
+                        WHERE race_id = ? AND rank = 1
+                          AND trifecta_payout IS NULL
+                    """, (payout, combo_str, race_id))
+                    n_updated += cur.rowcount
+                except sqlite3.Error as e:
+                    logger.warning("UPDATE エラー %s: %s", race_id, e)
+            conn.commit()
+            conn.close()
+
+            if n_updated > 0:
+                updated_total += n_updated
+                logger.info("[%d/%d] %s jka=%s → %d 件更新",
+                            i, len(targets), date_str, jka, n_updated)
+
+            self._polite_sleep()
+
+        logger.info("backfill_payout 完了: %d 件更新", updated_total)
+
 
 # =========================================================
 # Kドリームズ補完スクレイパー
@@ -2016,6 +2202,8 @@ def main():
                              "（例: 2022-04-20,2023-08-26）")
     parser.add_argument("--backfill_agari", action="store_true",
                         help="agari_timeがNULLのレースの上がりタイムを再取得")
+    parser.add_argument("--backfill_payout", action="store_true",
+                        help="trifecta_payoutがNULLのレースの3連単払戻を再取得")
     parser.add_argument("--race_info", type=str, default=None,
                         help="Kドリームズからgrade/stage/is_midnightを補完"
                              "（YYYY-MM-DD）")
@@ -2065,6 +2253,14 @@ def main():
             db_path=args.db, delay=args.delay, jyo_cds=jyo_cds,
         )
         scraper.backfill_agari(args.start, args.end)
+        return
+
+    # 3連単払戻バックフィル
+    if args.backfill_payout:
+        scraper = ChariLotoScraper(
+            db_path=args.db, delay=args.delay, jyo_cds=jyo_cds,
+        )
+        scraper.backfill_payout(args.start, args.end)
         return
 
     # Kドリームズ補完モード
