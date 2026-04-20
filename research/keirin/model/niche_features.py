@@ -68,12 +68,24 @@ class NicheFeatures:
         hist = defaultdict(list)
         for _, row in df.iterrows():
             try:
+                kt_raw = row.get("kimari_te")
+                if kt_raw is None or pd.isna(kt_raw):
+                    kt = ""
+                else:
+                    kt = str(kt_raw)
+                    if kt.lower() == "nan":
+                        kt = ""
+                pref_raw = row.get("prefecture")
+                if pref_raw is None or pd.isna(pref_raw):
+                    pref = ""
+                else:
+                    pref = str(pref_raw)
                 hist[row["senshu_name"]].append({
                     "date": str(row["race_date"]),
                     "race_id": row["race_id"],
                     "rank": int(row["rank"]),
-                    "kimari_te": row.get("kimari_te") or "",
-                    "prefecture": row.get("prefecture") or "",
+                    "kimari_te": kt,
+                    "prefecture": pref,
                     "jyo_cd": int(row.get("jyo_cd") or 0),
                 })
             except (ValueError, TypeError):
@@ -138,8 +150,17 @@ class NicheFeatures:
         recent10 = prev_races[-10:]
         scores = []
         for h in recent10:
-            kt = h.get("kimari_te") or ""
-            # 部分一致
+            kt_raw = h.get("kimari_te")
+            if kt_raw is None:
+                kt = ""
+            else:
+                try:
+                    kt = str(kt_raw) if not isinstance(kt_raw, str) else kt_raw
+                except Exception:
+                    kt = ""
+                # NaN などの非文字列は除外
+                if kt.lower() == "nan":
+                    kt = ""
             w = 0.0
             for key, val in self.KIMARITE_WEIGHTS.items():
                 if key in kt:
