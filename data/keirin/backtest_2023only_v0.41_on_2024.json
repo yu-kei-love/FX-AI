@@ -1,0 +1,120 @@
+{
+  "normal": {
+    "trifecta__A_本命__0.2": {
+      "n_bets": 56553,
+      "n_hits": 1955,
+      "hit_rate": 3.46,
+      "roi": -25.65,
+      "total_bet": 5655300,
+      "total_return": 4204950
+    },
+    "trifecta__B_中穴__0.02": {
+      "n_bets": 379386,
+      "n_hits": 5357,
+      "hit_rate": 1.41,
+      "roi": -30.11,
+      "total_bet": 37938600,
+      "total_return": 26516750
+    },
+    "trifecta__C_穴__0.005": {
+      "n_bets": 313969,
+      "n_hits": 1831,
+      "hit_rate": 0.58,
+      "roi": -33.08,
+      "total_bet": 31396900,
+      "total_return": 21011670
+    },
+    "exacta__A_本命__0.2": {
+      "n_bets": 32272,
+      "n_hits": 5259,
+      "hit_rate": 16.3,
+      "roi": -19.73,
+      "total_bet": 3227200,
+      "total_return": 2590330
+    },
+    "quinella__B_中穴__0.05": {
+      "n_bets": 42608,
+      "n_hits": 2415,
+      "hit_rate": 5.67,
+      "roi": -27.32,
+      "total_bet": 4260800,
+      "total_return": 3096960
+    },
+    "trio__C_穴__0.005": {
+      "n_bets": 63671,
+      "n_hits": 1026,
+      "hit_rate": 1.61,
+      "roi": -36.94,
+      "total_bet": 6367100,
+      "total_return": 4014900
+    },
+    "wide__A_本命__0.2": {
+      "n_bets": 44934,
+      "n_hits": 17914,
+      "hit_rate": 39.87,
+      "roi": -21.62,
+      "total_bet": 4493400,
+      "total_return": 3521710
+    },
+    "n_races": 25895
+  },
+  "midnight": {
+    "trifecta__A_本命__0.2": {
+      "n_bets": 1188,
+      "n_hits": 40,
+      "hit_rate": 3.37,
+      "roi": -45.35,
+      "total_bet": 118800,
+      "total_return": 64930
+    },
+    "trifecta__B_中穴__0.02": {
+      "n_bets": 5582,
+      "n_hits": 104,
+      "hit_rate": 1.86,
+      "roi": -45.01,
+      "total_bet": 558200,
+      "total_return": 306950
+    },
+    "trifecta__C_穴__0.005": {
+      "n_bets": 5720,
+      "n_hits": 86,
+      "hit_rate": 1.5,
+      "roi": -22.4,
+      "total_bet": 572000,
+      "total_return": 443850
+    },
+    "exacta__A_本命__0.2": {
+      "n_bets": 971,
+      "n_hits": 175,
+      "hit_rate": 18.02,
+      "roi": -24.79,
+      "total_bet": 97100,
+      "total_return": 73030
+    },
+    "quinella__B_中穴__0.05": {
+      "n_bets": 1239,
+      "n_hits": 125,
+      "hit_rate": 10.09,
+      "roi": -29.73,
+      "total_bet": 123900,
+      "total_return": 87060
+    },
+    "trio__C_穴__0.005": {
+      "n_bets": 2039,
+      "n_hits": 96,
+      "hit_rate": 4.71,
+      "roi": -23.49,
+      "total_bet": 203900,
+      "total_return": 156000
+    },
+    "wide__A_本命__0.2": {
+      "n_bets": 1183,
+      "n_hits": 544,
+      "hit_rate": 45.98,
+      "roi": -21.08,
+      "total_bet": 118300,
+      "total_return": 93360
+    },
+    "n_races": 1810
+  }
+}

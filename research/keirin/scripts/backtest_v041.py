@@ -46,12 +46,12 @@ def log(msg):
         pass
 
 
-def run(is_midnight=False):
+def run(is_midnight=False, suffix="v0.41"):
     label = "midnight" if is_midnight else "normal"
     label_ja = "ミッドナイト" if is_midnight else "通常"
-    log(f"\n=== v0.41 {label_ja} backtest ===")
+    log(f"\n=== {suffix} {label_ja} backtest ===")
 
-    model_path = MODEL_DIR / f"stage1_{label}_v0.41.pkl"
+    model_path = MODEL_DIR / f"stage1_{label}_{suffix}.pkl"
     if not model_path.exists():
         log(f"モデルなし: {model_path}")
         return None
@@ -251,17 +251,88 @@ def summarize(results):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test_year", type=str, default=None,
+                        help="YYYY を指定するとその年をテスト")
+    parser.add_argument("--model_suffix", type=str, default="v0.41")
+    parser.add_argument("--mode", type=str, default="both",
+                        choices=["both", "normal", "midnight"])
+    parser.add_argument("--out_suffix", type=str, default=None,
+                        help="出力 JSON のサフィックス")
+    args = parser.parse_args()
+
+    # test year override
+    if args.test_year:
+        import backtest as bt
+        bt.TEST_START = f"{args.test_year}0101"
+        bt.TEST_END = f"{args.test_year}1231"
+        # モジュール変数更新後、このモジュールの import も更新
+        global TEST_START, TEST_END
+        TEST_START = bt.TEST_START
+        TEST_END = bt.TEST_END
+
     log("=" * 60)
-    log("v0.41 節リズム+ニッチ backtest (2024年)")
+    log(f"backtest: suffix={args.model_suffix} "
+        f"test={args.test_year or '2024'}")
     log("=" * 60)
     results = []
-    for is_mid in [False, True]:
-        r = run(is_midnight=is_mid)
+    targets = []
+    if args.mode in ("both", "normal"):
+        targets.append(False)
+    if args.mode in ("both", "midnight"):
+        targets.append(True)
+    for is_mid in targets:
+        r = run(is_midnight=is_mid, suffix=args.model_suffix)
         if r:
             results.append(r)
     if results:
-        summarize(results)
-    log("v0.41 backtest 完了")
+        # summarize で出力 JSON path を切り替え
+        out_tag = args.out_suffix or (
+            f"{args.model_suffix}_on_{args.test_year or '2024'}"
+        )
+        _save_with_tag(results, out_tag)
+    log(f"backtest 完了: {args.model_suffix} on {args.test_year or '2024'}")
+
+
+def _save_with_tag(results, tag):
+    log(f"\n=== 結果サマリ ({tag}) ===")
+    highlights = [
+        ("trifecta", "A_本命", 0.20),
+        ("trifecta", "B_中穴", 0.02),
+        ("trifecta", "C_穴",   0.005),
+        ("exacta",   "A_本命", 0.20),
+        ("quinella", "B_中穴", 0.05),
+        ("trio",     "C_穴",   0.005),
+        ("wide",     "A_本命", 0.20),
+    ]
+    out = {}
+    for r in results:
+        lbl = r["label"]
+        out[lbl] = {}
+        log(f"\n-- {lbl} (n={r['n_races']:,}) --")
+        log(f"  {'ticket':>8} {'pattern':<10} {'pth':>7} "
+            f"{'n':>8} {'hit%':>6} {'ROI':>8}")
+        for tk, pn, pt in highlights:
+            s = r["stats"].get((tk, pn, pt))
+            if not s or s["n_bets"] == 0:
+                continue
+            roi = (s["total_return"] / s["total_bet"] - 1) * 100
+            hr = s["n_hits"] / s["n_bets"] * 100
+            log(f"  {tk:>8} {pn:<10} {pt:>7.3f} {s['n_bets']:>8,} "
+                f"{hr:>5.2f}% {roi:>+7.2f}%")
+            key = f"{tk}__{pn}__{pt}"
+            out[lbl][key] = {
+                "n_bets": s["n_bets"], "n_hits": s["n_hits"],
+                "hit_rate": round(hr, 2), "roi": round(roi, 2),
+                "total_bet": s["total_bet"],
+                "total_return": s["total_return"],
+            }
+        out[lbl]["n_races"] = r["n_races"]
+    out_path = REPORT_DIR / f"backtest_{tag}.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=2, ensure_ascii=False)
+    log(f"保存: {out_path}")
 
 
 if __name__ == "__main__":

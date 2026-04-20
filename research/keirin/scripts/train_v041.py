@@ -148,9 +148,9 @@ def build_dataset(is_midnight, start, end):
     return X, y, dates
 
 
-def train_one(is_midnight, start="2022-01-01", end="2023-12-31"):
+def train_one(is_midnight, start="2022-01-01", end="2023-12-31", suffix="v0.41"):
     label = "midnight" if is_midnight else "normal"
-    log(f"\n=== v0.41 Stage1 {label} 開始 ===")
+    log(f"\n=== v0.41 Stage1 {label} ({suffix}) 開始 ===")
     t0 = time.time()
     X, y, dates = build_dataset(is_midnight, start, end)
     log(f"  X shape: {X.shape}")
@@ -191,7 +191,7 @@ def train_one(is_midnight, start="2022-01-01", end="2023-12-31"):
             mark = " [NC]"
         log(f"    {n}: {s:.0f}{mark}")
 
-    out = MODEL_DIR / f"stage1_{label}_v0.41.pkl"
+    out = MODEL_DIR / f"stage1_{label}_{suffix}.pkl"
     with open(out, "wb") as f:
         pickle.dump({
             "model": final, "cv_mean_auc": cv_mean,
@@ -204,18 +204,35 @@ def train_one(is_midnight, start="2022-01-01", end="2023-12-31"):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_start", type=str, default="2022-01-01")
+    parser.add_argument("--train_end", type=str, default="2023-12-31")
+    parser.add_argument("--suffix", type=str, default="v0.41",
+                        help="モデルファイル名サフィックス")
+    parser.add_argument("--mode", type=str, default="both",
+                        choices=["both", "normal", "midnight"])
+    args = parser.parse_args()
+
     log("=" * 60)
-    log("v0.41 節リズム+ニッチ特徴量 Stage1 訓練 (FEATURE_NAMES_V041=68)")
+    log(f"v0.41 Stage1 訓練: {args.train_start} 〜 {args.train_end} "
+        f"suffix={args.suffix}")
     log("=" * 60)
     results = []
-    for is_mid in [False, True]:
-        r = train_one(is_mid)
+    targets = []
+    if args.mode in ("both", "normal"):
+        targets.append(False)
+    if args.mode in ("both", "midnight"):
+        targets.append(True)
+    for is_mid in targets:
+        r = train_one(is_mid, args.train_start, args.train_end,
+                      suffix=args.suffix)
         if r:
             results.append(r)
-    log("\n=== v0.41 結果 ===")
+    log(f"\n=== {args.suffix} 結果 ===")
     for r in results:
         log(f"  {r['label']}: CV AUC={r['cv_mean_auc']:.4f}")
-    log("v0.41 訓練完了")
+    log(f"{args.suffix} 訓練完了")
 
 
 if __name__ == "__main__":
