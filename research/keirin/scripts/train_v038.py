@@ -83,14 +83,22 @@ def train_and_eval(model_cls, X, y, dates, payouts, label):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_start", type=str, default="2022-01-01")
+    parser.add_argument("--train_end", type=str, default="2023-12-31")
+    parser.add_argument("--suffix", type=str, default="v0.38")
+    args = parser.parse_args()
+
     t0 = time.time()
     print("=" * 60)
-    print("  v0.38 本命/穴モデル分離訓練")
+    print(f"  v0.38 本命/穴モデル分離訓練 {args.train_start} 〜 {args.train_end}")
+    print(f"  suffix: {args.suffix}")
     print("=" * 60)
 
-    # 通常レース 2022-2023 学習
+    # 通常レース 学習
     X, y, dates, race_ids, payouts = load_with_payouts(
-        is_midnight=False, start="2022-01-01", end="2023-12-31",
+        is_midnight=False, start=args.train_start, end=args.train_end,
     )
     if X is None:
         print("データなし")
@@ -104,25 +112,27 @@ def main():
     fav, fav_cv, fav_imp = train_and_eval(
         FavoriteStage1Model, X, y, dates, payouts, "FAVORITE"
     )
-    with open(MODEL_DIR / "stage1_normal_favorite_v0.38.pkl", "wb") as f:
+    fav_path = MODEL_DIR / f"stage1_normal_favorite_{args.suffix}.pkl"
+    with open(fav_path, "wb") as f:
         pickle.dump({
             "model": fav, "cv_mean_auc": fav_cv,
             "feature_names": FEATURE_NAMES,
-            "train_start": "2022-01-01", "train_end": "2023-12-31",
+            "train_start": args.train_start, "train_end": args.train_end,
         }, f)
-    print(f"保存: stage1_normal_favorite_v0.38.pkl")
+    print(f"保存: {fav_path.name}")
 
     # underdog
     ud, ud_cv, ud_imp = train_and_eval(
         UnderdogStage1Model, X, y, dates, payouts, "UNDERDOG"
     )
-    with open(MODEL_DIR / "stage1_normal_underdog_v0.38.pkl", "wb") as f:
+    ud_path = MODEL_DIR / f"stage1_normal_underdog_{args.suffix}.pkl"
+    with open(ud_path, "wb") as f:
         pickle.dump({
             "model": ud, "cv_mean_auc": ud_cv,
             "feature_names": FEATURE_NAMES,
-            "train_start": "2022-01-01", "train_end": "2023-12-31",
+            "train_start": args.train_start, "train_end": args.train_end,
         }, f)
-    print(f"保存: stage1_normal_underdog_v0.38.pkl")
+    print(f"保存: {ud_path.name}")
 
     # 特徴量重要度比較 JSON 出力
     analysis = {
@@ -132,7 +142,7 @@ def main():
         "underdog_top20": [{"feat": f, "score": float(s)} for f, s in ud_imp[:20]],
         "trained_at": pd.Timestamp.now().isoformat(),
     }
-    out = REPORT_DIR / "v038_feature_analysis.json"
+    out = REPORT_DIR / f"v038_feature_analysis_{args.suffix}.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(analysis, f, indent=2, ensure_ascii=False)
     print(f"\n重要度分析: {out}")

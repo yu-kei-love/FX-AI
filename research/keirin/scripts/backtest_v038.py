@@ -213,24 +213,33 @@ def summarize(result, label):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_suffix", type=str, default="v0.38")
+    parser.add_argument("--test_year", type=str, default="2024")
+    parser.add_argument("--out_suffix", type=str, default=None)
+    args = parser.parse_args()
+
     t0 = time.time()
-    fav_path = MODEL_DIR / "stage1_normal_favorite_v0.38.pkl"
-    ud_path  = MODEL_DIR / "stage1_normal_underdog_v0.38.pkl"
+    fav_path = MODEL_DIR / f"stage1_normal_favorite_{args.model_suffix}.pkl"
+    ud_path  = MODEL_DIR / f"stage1_normal_underdog_{args.model_suffix}.pkl"
 
     print("=" * 60)
-    print("  v0.38 バックテスト (2024年, 通常レース)")
+    print(f"  backtest (test_year={args.test_year}, suffix={args.model_suffix})")
     print("=" * 60)
 
     fav = _load_model(fav_path)
     ud  = _load_model(ud_path)
 
     print("\n[FAVORITE モデル] 評価中...")
-    r_fav = eval_model(wrap(fav), "favorite", is_midnight=False, test_year="2024")
+    r_fav = eval_model(wrap(fav), "favorite", is_midnight=False,
+                       test_year=args.test_year)
     print(f"  対象レース: {r_fav['n_races']:,}")
     summarize(r_fav, "FAVORITE")
 
     print("\n[UNDERDOG モデル] 評価中...")
-    r_ud = eval_model(wrap(ud), "underdog", is_midnight=False, test_year="2024")
+    r_ud = eval_model(wrap(ud), "underdog", is_midnight=False,
+                      test_year=args.test_year)
     print(f"  対象レース: {r_ud['n_races']:,}")
     summarize(r_ud, "UNDERDOG")
 
@@ -256,12 +265,14 @@ def main():
     comparison = {
         "favorite": to_summary(r_fav),
         "underdog": to_summary(r_ud),
-        "test_year": "2024",
+        "test_year": args.test_year,
+        "model_suffix": args.model_suffix,
         "n_races_favorite": r_fav["n_races"],
         "n_races_underdog": r_ud["n_races"],
         "generated_at": pd.Timestamp.now().isoformat(),
     }
-    out_path = REPORT_DIR / "v038_comparison.json"
+    out_tag = args.out_suffix or f"{args.model_suffix}_on_{args.test_year}"
+    out_path = REPORT_DIR / f"v038_comparison_{out_tag}.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(comparison, f, indent=2, ensure_ascii=False)
     print(f"\n保存: {out_path}")

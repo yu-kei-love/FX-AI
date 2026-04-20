@@ -1,0 +1,169 @@
+{
+  "favorite_cv_auc": 0.8027483734835079,
+  "underdog_cv_auc": 0.7912481445706783,
+  "favorite_top20": [
+    {
+      "feat": "H03_grade_score_vs_field",
+      "score": 1222.0
+    },
+    {
+      "feat": "G04_field_strength",
+      "score": 1143.0
+    },
+    {
+      "feat": "I04_elo_rating",
+      "score": 1041.0
+    },
+    {
+      "feat": "A03_win_rate",
+      "score": 935.0
+    },
+    {
+      "feat": "A05_third_rate",
+      "score": 899.0
+    },
+    {
+      "feat": "I05_recent_agari_avg",
+      "score": 895.0
+    },
+    {
+      "feat": "I02_recent_trend_score",
+      "score": 887.0
+    },
+    {
+      "feat": "I06_agari_trend",
+      "score": 869.0
+    },
+    {
+      "feat": "A02_grade_score",
+      "score": 805.0
+    },
+    {
+      "feat": "A04_second_rate",
+      "score": 714.0
+    },
+    {
+      "feat": "A11_term",
+      "score": 639.0
+    },
+    {
+      "feat": "G01_race_no",
+      "score": 563.0
+    },
+    {
+      "feat": "H02_back_count_rank",
+      "score": 556.0
+    },
+    {
+      "feat": "J02_makuri_rate",
+      "score": 506.0
+    },
+    {
+      "feat": "J03_sashi_rate",
+      "score": 502.0
+    },
+    {
+      "feat": "A10_age",
+      "score": 500.0
+    },
+    {
+      "feat": "H01_grade_score_rank",
+      "score": 350.0
+    },
+    {
+      "feat": "A09_start_count",
+      "score": 344.0
+    },
+    {
+      "feat": "A08_back_count",
+      "score": 340.0
+    },
+    {
+      "feat": "J01_nige_rate",
+      "score": 320.0
+    }
+  ],
+  "underdog_top20": [
+    {
+      "feat": "H03_grade_score_vs_field",
+      "score": 4066.0
+    },
+    {
+      "feat": "I04_elo_rating",
+      "score": 3682.0
+    },
+    {
+      "feat": "I05_recent_agari_avg",
+      "score": 3423.0
+    },
+    {
+      "feat": "I06_agari_trend",
+      "score": 3289.0
+    },
+    {
+      "feat": "G04_field_strength",
+      "score": 3277.0
+    },
+    {
+      "feat": "A05_third_rate",
+      "score": 2832.0
+    },
+    {
+      "feat": "I02_recent_trend_score",
+      "score": 2805.0
+    },
+    {
+      "feat": "A02_grade_score",
+      "score": 2700.0
+    },
+    {
+      "feat": "A04_second_rate",
+      "score": 2691.0
+    },
+    {
+      "feat": "A03_win_rate",
+      "score": 2593.0
+    },
+    {
+      "feat": "A11_term",
+      "score": 2172.0
+    },
+    {
+      "feat": "A10_age",
+      "score": 1733.0
+    },
+    {
+      "feat": "J03_sashi_rate",
+      "score": 1706.0
+    },
+    {
+      "feat": "H02_back_count_rank",
+      "score": 1694.0
+    },
+    {
+      "feat": "J02_makuri_rate",
+      "score": 1693.0
+    },
+    {
+      "feat": "G01_race_no",
+      "score": 1689.0
+    },
+    {
+      "feat": "A09_start_count",
+      "score": 1212.0
+    },
+    {
+      "feat": "J01_nige_rate",
+      "score": 1118.0
+    },
+    {
+      "feat": "B04_line_grade_score",
+      "score": 1091.0
+    },
+    {
+      "feat": "H01_grade_score_rank",
+      "score": 1057.0
+    }
+  ],
+  "trained_at": "2026-04-20T23:59:37.927547"
+}
