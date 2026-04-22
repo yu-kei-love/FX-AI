@@ -1,0 +1,13 @@
+{
+  "total_races": 81674,
+  "parse_fail": 0,
+  "honmei_1st_rate": 28.880671939662562,
+  "honmei_top3_rate": 59.8427896270539,
+  "rec_set_1st_rate": 75.52587114626441,
+  "rec_set_top3_rate": 95.31062516835223,
+  "ni_candidate_top2": 28.943115312094424,
+  "normal_n": 77248,
+  "normal_honmei_1st_rate": 28.47970173985087,
+  "mid_n": 4426,
+  "mid_honmei_1st_rate": 35.87889742431089
+}
