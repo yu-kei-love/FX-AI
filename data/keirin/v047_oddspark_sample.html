@@ -1,0 +1,966 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<head>
+  
+  
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+		<meta http-equiv="content-style-type" content="text/css" />
+		<meta http-equiv="content-script-type" content="text/javascript" />
+		<meta http-equiv="content-language" content="ja" />
+
+		<meta name="author" content="Odds Park Corp." />
+		<meta name="Keywords" content="競輪,KEIRIN,ケイリン,ライブ中継,無料予想" />
+		<meta name="Description" content="オッズパークでは、競輪（KEIRIN）の車券をインターネットで購入することができます。レースの予想情報やライブ映像も【無料】でご覧いただけます。またオッズパークLOTOでは最高12億円の重勝式投票券も販売しています。" />
+		<meta name="copyright" content="Copyright (C) Odds Park Corp. Co., Ltd. All Rights Reserved." lang="en" />
+		<meta http-equiv="pragma" content="no-cache" />
+		<meta http-equiv="cache-control" content="no-cache" />
+		<meta http-equiv="expires" content="-1" />
+
+  
+  <title>AI予想｜競輪（KEIRIN）ならオッズパーク競輪</title>
+
+  
+  
+		<link rel="stylesheet" type="text/css" media="screen,print" href="/ud_shared/pc/keirin/keirin/shared/css/main.css?20131001&20220510132530" />
+		<link rel="stylesheet" type="text/css" media="screen,print" href="/ud_shared/pc/keirin/keirin/shared/css/lib.css?20220510132533" />
+		<link rel="stylesheet" type="text/css" media="screen,print" href="/ud_shared/pc/keirin/keirin/shared/css/modal.css?20131001&20220510132532" />
+		<script type="text/javascript" src="/ud_shared/pc/keirin/keirin/shared/js/jquery-3.6.0.min.js?20220510132531"></script>
+		<script type="text/javascript" src="/ud_shared/pc/keirin/keirin/shared/js/lib.js?201505&20260325102651"></script>
+		<script type="text/javascript" src="/ud_shared/pc/keirin/keirin/shared/js/jquery.easing.1.3.js?20220510132530"></script>
+		<script type="text/javascript" src="/ud_shared/pc/keirin/keirin/shared/js/jquery.modal.js?20131011&20220510132530"></script>
+		<script type="text/javascript" src="/ud_shared/pc/keirin/keirin/shared/js/info-util.js?20130801&20220510132531"></script>
+
+  <link href="/ud_shared/ai-keirin/css/keirinai-thema.css?20260317210708" rel="stylesheet" />
+  <link href="/ud_shared/ai-keirin/css/style-pc.css?20260317210708" rel="stylesheet" />
+  <link href="/ud_shared/ai-keirin/css/profile-pc.css?20260317210708" rel="stylesheet" />
+  
+  <link rel="alternate" media="only screen and (max-width: 640px)"
+   href="https://sp.oddspark.com/keirin/yosou/ai/SpProfile.do?jo_code=47&amp;race_date=20240108&amp;yosou_model=1"
+  />
+</head>
+<body id="info">
+
+<div id="wrap">
+
+  
+  
+			<div id="header">
+				<div id="headerInner">
+					<a href="/keirin/"><h1>競輪（KEIRIN・ケイリン）ならオッズパーク競輪｜予想情報も充実！</h1></a>
+					&nbsp;<h2>車券が買える！競輪を楽しむならオッズパーク</h2>
+					&nbsp;<ul id="nav1">
+					
+					
+						<li><a href="/keirin/KeirinTop.do?SSO_FORCE_LOGIN=1&amp;SSO_URL_RETURN=https://www.oddspark.com/keirin/yosou/ai/Profile.do?confidence%3D3%26jo_code%3D47%26race_date%3D20240108%26yosou_model%3D1">ログイン</a></li>
+						<li><a href="/user/new/RegTop.do?src=31">新規会員登録(無料)</a></li>
+					
+						<li><a href="https://faq.oddspark.com/">よくあるご質問</a></li>
+						<li><a href="/">総合TOP</a></li>
+					</ul>
+					<ul id="nav2">
+						<li><a href="/keiba" class="nv1">競馬</a></li>
+						<li class="active"><a href="/keirin/" class="nv2">競輪</a></li>
+						<li><a href="/autorace" class="nv8">オートレース</a></li>
+						<li><a href="/loto" class="nv3">LOTO</a></li>
+						<li><a href="/keirin/auth/VoteKeirinTop.do" onclick="openFullWindow(this.href); return false;" class="nv4">投票する</a></li>
+						<li><a href="/auth/NyukinMenu.do" onclick="openFullWindow(this.href); return false;" class="nv5">入金・精算</a></li>
+						<li><a href="/auth/InqTop.do" onclick="openFullWindow(this.href); return false;" class="nv6">照会</a></li>
+						<li><a href="/user/my/Index.do" class="nv7">マイページ</a></li>
+					</ul>
+				</div>
+			</div><!-- //header -->
+
+  
+  
+			<div id="nav">
+				<ul>
+					<li><a href="/keirin/" class="nv1">TOP</a></li>
+					<li><a href="/keirin/RaceListInfo.do" class="nv2">レース情報</a></li>
+					<li class="active"><a href="/keirin/yosou/" class="nv3">予想情報</a></li>
+					<li><a href="/keirin/KaisaiCalendar.do" class="nv4">スケジュール</a></li>
+					<li><a href="/keirin/SearchPlayer.do" class="nv5">データベース</a></li>
+					<li><a href="/keirin/campaign/" class="nv6">キャンペーン</a></li>
+				</ul>
+			</div>
+			<!-- //nav -->
+			
+
+
+
+<div id="keirin-ai-yosou-content">
+  
+    
+  <ul id="bcrumb">
+    <li><a href="/">オッズパークTOP</a></li>
+    <li><a href="/keirin/">競輪TOP</a></li>
+    <li><a href="/keirin/yosou/">競輪予想</a></li>
+    <li><a href="/keirin/yosou/ai/Profile.do">AI予想</a></li>
+    <li>1月8日 松阪</li>
+  </ul>
+  
+    
+    
+    <div class="clr">&nbsp;</div>
+  
+
+  
+
+  
+  <div class="container-ai-selector">
+    <ul class="ai-selector">
+      <li>
+        <a class="ai-link" href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=0">
+          <span class="with-icon"
+           style="--icon: url(&#39;/ud_shared/ai-keirin/image/targetblack.png&#39;);
+           --hover-icon: url(&#39;/ud_shared/ai-keirin/image/targetwhite.png&#39;);"
+          >的中率重視AI予想</span>
+          
+          
+        </a>
+      </li>
+      <li>
+        <a class="ai-link selected" href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1">
+          
+          <span class="with-icon"
+           style="--icon: url(&#39;/ud_shared/ai-keirin/image/percentwhite.png&#39;);
+           --hover-icon: url(&#39;/ud_shared/ai-keirin/image/percentwhite.png&#39;);"
+          >回収率重視AI予想</span>
+          
+        </a>
+      </li>
+      <li>
+        <a class="ai-link" href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=2">
+          
+          
+          <span class="with-icon"
+           style="--icon: url(&#39;/ud_shared/ai-keirin/image/barblack.png&#39;);
+           --hover-icon: url(&#39;/ud_shared/ai-keirin/image/barwhite.png&#39;);"
+          >大穴的中重視AI予想</span>
+        </a>
+      </li>
+    </ul>
+    
+  </div>
+
+
+  
+
+  <h2>予想レース</h2>
+
+  
+  <!-- 開催日 -->
+  
+  <div class="day-bar container-day-bar">
+    <a class="day-bar-link" href="?confidence=3&amp;jo_code=47&amp;race_date=20240106&amp;yosou_model=1">
+      <span>1月6日</span>
+    </a>
+    <a class="day-bar-paging left"
+     href="?confidence=3&amp;jo_code=47&amp;race_date=20240105&amp;yosou_model=1"
+     style="--icon: url(&#39;/ud_shared/ai-keirin/image/whiteleft.png&#39;);
+       --icon-reverse: url(&#39;/ud_shared/ai-keirin/image/blueleft.png&#39;);
+       --icon-sp: url(&#39;/ud_shared/ai-keirin/image/lineleft.png&#39;);"
+    >
+    </a>
+    <a class="day-bar-link day-bar-gray" href="?confidence=3&amp;jo_code=47&amp;race_date=20240107&amp;yosou_model=1">
+      <span> 1月7日</span></a>
+    <a class="day-bar-link selected" href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1">
+      <span>1月8日</span>
+    </a>
+    <a class="day-bar-paging right"
+       href="?confidence=3&amp;jo_code=47&amp;race_date=20240109&amp;yosou_model=1"
+       style="--icon: url(&#39;/ud_shared/ai-keirin/image/whiteright.png&#39;);
+         --icon-reverse: url(&#39;/ud_shared/ai-keirin/image/blueright.png&#39;);
+         --icon-sp: url(&#39;/ud_shared/ai-keirin/image/lineright.png&#39;);"
+      >
+      </a>
+  </div>
+
+  
+  <!-- 開催場 -->
+  
+   
+    
+      <div class="container-jo-selector">
+        <ul class="jo-selector">
+          <li>
+            <a class="jo-link  low-priority " href="?confidence=3&amp;jo_code=1&amp;race_date=20240108&amp;yosou_model=1">
+              すべて
+            </a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=25&amp;race_date=20240108&amp;yosou_model=1">大宮</a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=31&amp;race_date=20240108&amp;yosou_model=1">松戸</a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=37&amp;race_date=20240108&amp;yosou_model=1">伊東</a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=44&amp;race_date=20240108&amp;yosou_model=1">大垣</a>
+          </li>
+          <li>
+            <a class="jo-link selected low-priority"
+             href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1">松阪</a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=56&amp;race_date=20240108&amp;yosou_model=1">岸和田</a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=71&amp;race_date=20240108&amp;yosou_model=1">高松</a>
+          </li>
+          <li>
+            <a class="jo-link  low-priority"
+             href="?confidence=3&amp;jo_code=75&amp;race_date=20240108&amp;yosou_model=1">松山</a>
+          </li>
+        </ul>
+      </div>
+    
+      <div class="race-confident-selector">
+        <!-- 自信度 -->
+        <ul class="confident-selector">
+          <li>
+            <a href="?confidence=0&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1">
+              すべて
+            </a>
+          </li>
+          <li>
+            <a href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1"
+             class="selected"
+            >★★★</a>
+          </li>
+          <li>
+            <a href="?confidence=2&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1"
+            >★★</a>
+          </li>
+          <li>
+            <a href="?confidence=1&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1"
+            >★</a>
+          </li>
+          <div class="confident-selector-help">
+            <img class="question-group" src="/ud_shared/ai-keirin/image/questiongray.png?20260317210708" alt="questiongray" />
+            
+            
+  <div class="cluetip">
+  <div class="cluetip-outer">
+    <h3 class="cluetip-title">自信度（<font size="2px">★★★</font>）について</h3>
+    <div class="cluetip-inner">★★★：AI予想の期待値がとても高いオススメのレース
+      <br>★★：AI予想の期待値が高めのレース
+      <br>★：AI予想の期待値は高くないレース</div>
+    </div>
+    <div class="cluetip-extra"></div>
+</div>
+
+          </div>
+        </ul>
+        <!-- レース一覧 -->
+        <input type="checkbox" id="showAllRaces" class="race-selector-showall" />
+        <div class="race-selector">
+          
+        </div>
+        
+      </div>
+
+      <div class="container-today-remark">
+        <h3 class="today-remark-header">
+          <span class="title">本日の推奨レース</span>
+          
+            
+  <span class="confidence-label">
+    <span class="confidence-label-text">自信度</span>
+    <span class="confidence-star">
+  <span style="font-size: 0; display: inline-block;">
+    <img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" /><img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" />
+    <img src="/ud_shared/ai-keirin/image/starwhite.png?20260317210708" alt="starwhite" />
+  </span>
+</span>
+  </span>
+    <div class="confident-popup">
+      <span class="question-group">
+        
+        
+          <img src="/ud_shared/ai-keirin/image/questiongray.png?20260317210708" alt="questiongray" />
+        
+      </span>
+      <!-- ポップアップ -->
+      
+  <div class="cluetip">
+  <div class="cluetip-outer">
+    <h3 class="cluetip-title">自信度（<font size="2px">★★★</font>）について</h3>
+    <div class="cluetip-inner">★★★：AI予想の期待値がとても高いオススメのレース
+      <br>★★：AI予想の期待値が高めのレース
+      <br>★：AI予想の期待値は高くないレース</div>
+    </div>
+    <div class="cluetip-extra"></div>
+</div>
+
+    </div>
+
+          
+        </h3>
+
+        
+
+        <div class="today-remark">
+          <div class="today-remark-race">
+            <span class="today-remark-race-text">松山 </span>
+            <span class="today-remark-race-text">4R</span>
+            
+            <span class="today-remark-race-time" >終了</span>
+          </div>
+          <div class="today-remark-link">
+            <a href="/keirin/yosou/ai/RaceYosou.do?jo_code=75&amp;race_date=20240108&amp;race_no=4&amp;yosou_model=1"
+            >AI予想・買い目</a>
+          </div>
+        </div>
+      </div>
+    
+  
+
+  <div class="entry-or-update">
+    <a href="/keirin/yosou/ai/RaceList.do?jo_code=47&amp;race_date=20240108" class="entry-or-update-btn">
+      <img src="/ud_shared/ai-keirin/image/calendargray.png?20260317210708" alt="entryImage" />
+      <span class="to-list">出走表一覧へ</span>
+    </a>
+    <a href="?confidence=3&amp;jo_code=47&amp;race_date=20240108&amp;yosou_model=1" class="entry-or-update-btn">
+      <img src="/ud_shared/ai-keirin/image/reload.png?20260317210708" alt="update-image" />
+      <span class="to-update">開催情報更新</span>
+    </a>
+  </div>
+  
+
+  
+  <h2 class="with-annotation">
+    <span class="title">予想実績</span>
+    <span class="aggregate_term">集計期間：1月24日 ～ 4月23日</span>
+  </h2>
+  <div class="container-yoso-result yoso-result">
+    <h3>最高払戻金額</h3>
+    <div class="best-price" style="--pc-background: url(&#39;/ud_shared/ai-keirin/image/race-title-pc.png&#39;); --sp-background: url(&#39;/ud_shared/ai-keirin/image/race-title-sp.png&#39;);">
+      <a href="/keirin/yosou/ai/RaceYosou.do?jo_code=11&amp;race_date=20260411&amp;race_no=4&amp;yosou_model=1"></a>
+      
+        <div class="best-price-content">
+          <div class="best-price-title">
+            
+              
+              <div class="race-title">ＦＭいるか杯＆モータク杯争奪戦</div>
+            
+            <div class="race-content">
+              <span>2026.4.11</span>
+              <span>|</span>
+              <span class="race-text">函館</span>
+              <span class="race-text">4R</span>
+              <span>3連単</span>
+            </div>
+          </div>
+          <div class="paragraph-container">
+            <span class="best-price-label">払戻金額</span>
+            <span class="best-price-value">228,830</span>
+            <span class="best-price-label">円</span>
+          </div>
+        </div>
+        
+      
+    </div>
+    
+    <h3>的中実績</h3>
+    <div class="good-price">
+      <div class="good-price-value-list">
+        <a href="/keirin/yosou/ai/RaceYosou.do?jo_code=47&amp;race_date=20260216&amp;race_no=4&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.16</span>
+            <span class="good-price-value-jomei">松阪</span>
+            <span class="good-price-value-raceno">4R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">125,780円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=55&amp;race_date=20260203&amp;race_no=8&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.3</span>
+            <span class="good-price-value-jomei">和歌山</span>
+            <span class="good-price-value-raceno">8R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">114,070円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=81&amp;race_date=20260307&amp;race_no=7&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.7</span>
+            <span class="good-price-value-jomei">小倉</span>
+            <span class="good-price-value-raceno">7R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">108,540円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=61&amp;race_date=20260204&amp;race_no=4&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.4</span>
+            <span class="good-price-value-jomei">玉野</span>
+            <span class="good-price-value-raceno">4R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">99,880円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=74&amp;race_date=20260128&amp;race_no=3&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.1.28</span>
+            <span class="good-price-value-jomei">高知</span>
+            <span class="good-price-value-raceno">3R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">91,890円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=53&amp;race_date=20260227&amp;race_no=6&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.27</span>
+            <span class="good-price-value-jomei">奈良</span>
+            <span class="good-price-value-raceno">6R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">85,870円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=36&amp;race_date=20260308&amp;race_no=12&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.8</span>
+            <span class="good-price-value-jomei">小田原</span>
+            <span class="good-price-value-raceno">12R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">80,540円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=61&amp;race_date=20260403&amp;race_no=9&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.4.3</span>
+            <span class="good-price-value-jomei">玉野</span>
+            <span class="good-price-value-raceno">9R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">78,600円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=23&amp;race_date=20260324&amp;race_no=10&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.24</span>
+            <span class="good-price-value-jomei">取手</span>
+            <span class="good-price-value-raceno">10R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">74,690円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=45&amp;race_date=20260304&amp;race_no=4&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.4</span>
+            <span class="good-price-value-jomei">豊橋</span>
+            <span class="good-price-value-raceno">4R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">65,850円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a>
+      </div>
+      <div class="good-price-value-list">
+        <a href="/keirin/yosou/ai/RaceYosou.do?jo_code=87&amp;race_date=20260304&amp;race_no=4&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.4</span>
+            <span class="good-price-value-jomei">熊本</span>
+            <span class="good-price-value-raceno">4R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">65,770円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=23&amp;race_date=20260227&amp;race_no=10&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.27</span>
+            <span class="good-price-value-jomei">取手</span>
+            <span class="good-price-value-raceno">10R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">62,840円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=42&amp;race_date=20260412&amp;race_no=5&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.4.12</span>
+            <span class="good-price-value-jomei">名古屋</span>
+            <span class="good-price-value-raceno">5R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">62,570円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=38&amp;race_date=20260325&amp;race_no=11&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.25</span>
+            <span class="good-price-value-jomei">静岡</span>
+            <span class="good-price-value-raceno">11R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">62,270円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=73&amp;race_date=20260422&amp;race_no=7&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.4.22</span>
+            <span class="good-price-value-jomei">小松島</span>
+            <span class="good-price-value-raceno">7R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">60,190円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=83&amp;race_date=20260218&amp;race_no=3&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.18</span>
+            <span class="good-price-value-jomei">久留米</span>
+            <span class="good-price-value-raceno">3R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">57,960円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=35&amp;race_date=20260210&amp;race_no=1&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.10</span>
+            <span class="good-price-value-jomei">平塚</span>
+            <span class="good-price-value-raceno">1R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">55,980円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=86&amp;race_date=20260412&amp;race_no=8&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.4.12</span>
+            <span class="good-price-value-jomei">別府</span>
+            <span class="good-price-value-raceno">8R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">54,270円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=83&amp;race_date=20260218&amp;race_no=5&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.2.18</span>
+            <span class="good-price-value-jomei">久留米</span>
+            <span class="good-price-value-raceno">5R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">51,720円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a><a href="/keirin/yosou/ai/RaceYosou.do?jo_code=38&amp;race_date=20260324&amp;race_no=12&amp;yosou_model=1">
+          <div class="good-price-value">
+            <span class="good-price-value-date">2026.3.24</span>
+            <span class="good-price-value-jomei">静岡</span>
+            <span class="good-price-value-raceno">12R</span>
+            <span class="good-price-value-bettype">3連単</span>
+            <span class="good-price-value-refund">51,200円</span>
+            <span class="good-price-value-showdetail">
+              <img src="/ud_shared/ai-keirin/image/lineright.png?20260317210708" />
+            </span>
+          </div>
+        </a>
+      </div>
+    </div>
+    
+
+    <h3>
+      <span class="title">賭式・自信度別成績</span>
+        <div class="seiseki-popup">
+          <span class="question-group">
+            <img src="/ud_shared/ai-keirin/image/questiongray.png?20260317210708" alt="questiongray" />
+          </span>
+          
+          
+  <div class="cluetip">
+  <div class="cluetip-outer">
+    <h3 class="cluetip-title">自信度（<font size="2px">★★★</font>）について</h3>
+    <div class="cluetip-inner">★★★：AI予想の期待値がとても高いオススメのレース
+      <br>★★：AI予想の期待値が高めのレース
+      <br>★：AI予想の期待値は高くないレース</div>
+    </div>
+    <div class="cluetip-extra"></div>
+</div>
+
+        </div>
+    </h3>
+    <div class="hit-rate-table-group">
+      
+      
+      <div class="hit-rate-table hit-rate-table-c3"
+      >
+        <table>
+          <tr class="hit-rate-bg-black">
+            <th colspan="3">
+  <span style="font-size: 0; display: inline-block;">
+    <img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" /><img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" /><img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" />
+    
+  </span>
+</th>
+          </tr>
+          <tr class="hit-rate-bg-black">
+            <th style="width: 74px">賭式</th>
+            <th>的中率</th>
+            <th>回収率</th>
+          </tr>
+          <tr>
+            <td>2枠単</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2枠複</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2車単</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2車複</td>
+            <td>26.1%</td>
+            <td>51.1%</td>
+          </tr>
+          <tr>
+            <td>ワイド</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>3連単</td>
+            <td>7.7%</td>
+            <td>58.3%</td>
+          </tr>
+          <tr>
+            <td>3連複</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold">全体</td>
+            <td data-calc="330 / 1067">30.9%</td>
+            <td data-calc="1284470 / 2283600">56.2%</td>
+          </tr>
+        </table>
+      </div>
+      <div class="hit-rate-table hit-rate-table-c2"
+      >
+        <table>
+          <tr class="hit-rate-bg-black">
+            <th colspan="3">
+  <span style="font-size: 0; display: inline-block;">
+    <img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" /><img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" />
+    <img src="/ud_shared/ai-keirin/image/starwhite.png?20260317210708" alt="starwhite" />
+  </span>
+</th>
+          </tr>
+          <tr class="hit-rate-bg-black">
+            <th style="width: 74px">賭式</th>
+            <th>的中率</th>
+            <th>回収率</th>
+          </tr>
+          <tr>
+            <td>2枠単</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2枠複</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2車単</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2車複</td>
+            <td>24.6%</td>
+            <td>57.0%</td>
+          </tr>
+          <tr>
+            <td>ワイド</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>3連単</td>
+            <td>5.3%</td>
+            <td>47.2%</td>
+          </tr>
+          <tr>
+            <td>3連複</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold">全体</td>
+            <td data-calc="816 / 3009">27.1%</td>
+            <td data-calc="3231160 / 6471000">49.9%</td>
+          </tr>
+        </table>
+      </div>
+      <div class="hit-rate-table hit-rate-table-c1"
+      >
+        <table>
+          <tr class="hit-rate-bg-black">
+            <th colspan="3">
+  <span style="font-size: 0; display: inline-block;">
+    <img src="/ud_shared/ai-keirin/image/star.png?20260317210708" alt="star" />
+    <img src="/ud_shared/ai-keirin/image/starwhite.png?20260317210708" alt="starwhite" /><img src="/ud_shared/ai-keirin/image/starwhite.png?20260317210708" alt="starwhite" />
+  </span>
+</th>
+          </tr>
+          <tr class="hit-rate-bg-black">
+            <th style="width: 74px">賭式</th>
+            <th>的中率</th>
+            <th>回収率</th>
+          </tr>
+          <tr>
+            <td>2枠単</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2枠複</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2車単</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>2車複</td>
+            <td>27.3%</td>
+            <td>59.7%</td>
+          </tr>
+          <tr>
+            <td>ワイド</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>3連単</td>
+            <td>6.3%</td>
+            <td>70.0%</td>
+          </tr>
+          <tr>
+            <td>3連複</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold">全体</td>
+            <td data-calc="805 / 2660">30.2%</td>
+            <td data-calc="3733260 / 5565600">67.0%</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <p class="hit-rate-notice-message">※全体の的中率はレース単位の算出となっております。</p>
+  </div>
+  
+
+  <h2>プロフィール</h2>
+
+  
+  <div class="container-profile">
+
+    <div class="profile-content profile-section-a">
+      
+      
+        <div>
+          <img src="/ud_shared/ai-keirin/image/balance.png?20260317210708"/>
+        </div>
+        <div class="profile-text">
+          <h3>回収率重視の予想!</h3>
+          <div>
+            <p>選手情報、過去2年以上のレース結果をベースとして、競輪場の特徴、ライン予想、直近レースの3着以内の確率などを考慮した予想となっています。</p>
+            <p>各選手の着順予想から、回収率の見込める予想となっています。</p>
+          </div>
+        </div>
+      
+      
+    </div>
+
+   <div class="container-charts container-circle-charts"
+    >
+      
+      
+      <div class="circle-chart-array profile-section-a circle-chart-array-reverse">
+        <div class="labeled-chart">
+          <div class="label">
+            <span>的中率</span>
+          </div>
+          <div class="circle-chart">
+  <div class="pie pie-bottom"
+   style="background-image: conic-gradient(#326bdb 0% 29%,#ccc 29% 100%)">
+    <div class="pie pie-top"><span class="pie-number">29</span></div>
+  </div>
+</div>
+        </div>
+        <div class="labeled-chart">
+          <div class="label">
+            <span>回収率</span>
+          </div>
+          <div class="circle-chart">
+  <div class="pie pie-bottom"
+   style="background-image: conic-gradient(#326bdb 0% 58%,#ccc 58% 100%)">
+    <div class="pie pie-top"><span class="pie-number">58</span></div>
+  </div>
+</div>
+        </div>
+      </div>
+      <p class="hit-rate-notice-message">※的中率はレース単位の算出となっております。</p>
+    </div>
+
+    <div class="profile-content profile-section-b">
+      <div>
+        <img src="/ud_shared/ai-keirin/image/note.png?20260317210708"/>
+      </div>
+      <div class="profile-text">
+        <h3>こんな方におすすめ!!</h3>
+        <ul class="suggest-list">
+          
+          
+            <li>当てることに加えて、回収率を重視したい方に！</li>
+            <li>自身の予想をレベルアップしたい方に！</li>
+          
+          
+        </ul>
+      </div>
+    </div>
+
+    <div class="container-charts container-line-charts"
+    >
+      <div class="line-chart-array">
+        <div class="labeled-chart">
+          <div class="label">
+            <span>回収率</span>
+          </div>
+          <div class="line-chart">
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-cursor" style="left: 57.599999999999994%">
+    <img src="/ud_shared/ai-keirin/image/bicycle.png?20260317210708"/>
+  </div>
+</div>
+        </div>
+        <div class="labeled-chart">
+          <div class="label">
+            <span>的中率</span>
+          </div>
+          <div class="line-chart">
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-point"></div>
+  <div class="line-chart-cursor" style="left: 30.049999999999997%">
+    <img src="/ud_shared/ai-keirin/image/bicycle.png?20260317210708"/>
+  </div>
+</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+</div>
+
+
+
+
+
+			<div id="footer">
+				<div id="footerInner">
+					<p id="copy">Copyright (C) Odds Park Corp. All Rights Reserved.</p>
+					<ul id="footerNav">
+						<li><a href="/service/company.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">会社案内</a></li>
+						<li><a href="/service/toiawase.pdf" target="_blank">特定商取引法に基づく表示</a></li>
+						<li><a href="/service/sitepolicy.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">サイトポリシー</a></li>
+						<li><a href="/service/privacy.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">個人情報保護方針</a></li>
+						<li><a href="/service/information-security.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">情報セキュリティ方針</a></li>
+						<li><a href="/service/customer-harassment.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">カスタマーハラスメントに対する方針</a></li>
+						<li><a href="/service/rule.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">免責事項</a></li>
+						<li><a href="https://forms.cloud.microsoft/r/wVYPY1Qn8y" onclick="window.open(this.href, '', 'width=1020, height=740, menubar=no, toolbar=no, scrollbars=yes'); return false;">ご意見・ご要望</a></li>
+						<li><a href="/service/link.html" onclick="window.open(this.href, '', 'width=1020, height=740, menubar=no, toolbar=no, scrollbars=yes'); return false;">リンク</a></li>
+					</ul>
+				</div>
+				<!-- //footerInner -->
+			</div>
+			<!-- //footer -->
+
+			<script type="text/javascript" src="/ud_shared/pc/keirin/keirin/shared/js/trace.js?20150326&20220510132531"></script>
+
+			<!-- Google Tag Manager -->
+			<noscript><iframe src="//www.googletagmanager.com/ns.html?id=GTM-M5GLNZ"
+			height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+			<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+			new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+			j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+			'//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+			})(window,document,'script','dataLayer','GTM-M5GLNZ');</script>
+			<!-- End Google Tag Manager -->
+
+			<script type="text/javascript">
+			(function () {
+				var tagjs = document.createElement("script");
+				var s = document.getElementsByTagName("script")[0];
+				tagjs.async = true;
+				tagjs.src = "//s.yjtag.jp/tag.js#site=mw1D83P";
+				s.parentNode.insertBefore(tagjs, s);
+			}());
+			</script>
+			<noscript>
+			<iframe src="//b.yjtag.jp/iframe?c=mw1D83P" width="1" height="1" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"></iframe>
+			</noscript>
+
+
+
+</div><script type="text/javascript"  src="/05P4w_hns/aNy1oL/QGQ/9furfb9f5GambkQ97p/ACR4OywxBA/Zy/0rMXkVJVsB"></script></body></html>

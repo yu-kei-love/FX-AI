@@ -1,0 +1,211 @@
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+		<meta http-equiv="content-style-type" content="text/css" />
+		<meta http-equiv="content-script-type" content="text/javascript" />
+		<meta http-equiv="content-language" content="ja" />
+		<meta name="robots" content="noindex" />
+		<meta name="author" content="Odds Park Corp." />
+		<meta name="Keywords" content="地方競馬,馬券,競輪,車券,オートレース" />
+		<meta name="Description" content="毎日投票できる地方競馬と競輪と、キャリーオーバーで最高6億円のオッズパークLOTO" />
+		<meta name="copyright" content="Copyright (C) Odds Park Corp. Co., Ltd. All Rights Reserved." lang="en" xml:lang="en" />
+		<title>ログイン｜オッズパーク</title>
+		<link rel="stylesheet" type="text/css" media="all" href="/sso/shared/css/main-sign.css?19700101085959" />
+		<link rel="stylesheet" type="text/css" media="all" href="/sso/shared/css/lib.css?19700101085959" />
+		<link rel="stylesheet" type="text/css" media="all" href="/sso/shared/css/jquery.tooltip.css?19700101085959" />
+		<link rel="stylesheet" type="text/css" media="all" href="/ud_shared/sso/g_attention.css?20240621000244" />
+		<script type="text/javascript" src="/sso/shared/js/jquery-3.6.0.min.js?19700101085959"></script>
+		<script type="text/javascript" src="/sso/shared/js/lib.js?19700101085959"></script>
+		<script type="text/javascript" src="/sso/shared/js/baloon.js?19700101085959"></script>
+		<script type="text/javascript" src="/sso/shared/js/jquery.tooltip.js?19700101085959"></script>
+		<script type="text/javascript" src="/sso/shared/js/sso.js?19700101085959"></script>
+		<script type="text/javascript" src="/sso/shared/js/top.js?19700101085959"></script>
+		<script type="text/javascript"><!--
+			function formSubmit(){
+				if (submitCheck()) {
+					document.loginForm.submit();
+				}
+			}
+		// --></script>
+	</head>
+
+	<body id="sign">
+		<div id="wrap">
+			
+
+
+			<div id="header2">
+				<div id="headerInner">
+					<a href="/"><h1>Odds Park</h1></a>
+				</div>
+			</div>
+			<!-- //header -->
+
+
+			<div id	="content">
+				<div class="clearfix">
+
+				
+				
+				
+
+					<!-- LeftPanel -->
+					<div class="w640px bl-left20">
+						<h2 class="short">ログイン</h2>
+						<p>登録されているIDとパスワードを入力し、「ログイン」ボタンを押してください。</p>
+
+						<form method="post" name="loginForm" autocomplete="off" action="https://www.oddspark.com/keirin/jsp/sso_filter/LoginPc.jsp">
+							<input type="hidden" name="SSO_PROCESS" value="LOGIN" />
+							<input type="hidden" name="SSO_URL_RETURN" value="https://www.oddspark.com/keirin/yosou/ai/RaceYosou.do?jo_code=75&amp;race_date=20240108&amp;race_no=4&amp;yosou_model=1"/>
+
+							<table class="tb22 w95pr">
+								<tr>
+									<th>オッズパークＩＤ </th>
+									<td>
+										・半角英数字で入力してください。<br />
+										<input type="text" name="SSO_ACCOUNTID" style="ime-mode:disabled" maxlength="20"/>
+									</td>
+								</tr>
+								<tr>
+									<th>パスワード</th>
+									<td>
+										<input type="password" id="password" name="SSO_PASSWORD" maxlength="64" />
+										<div id="password-masking" class="open-eye"></div>
+									</td>
+								</tr>
+								<tr>
+									<th>自動ログイン</th>
+									<td>
+										<input id="auto_login" type="checkbox" name="SSO_AUTO_FLG" value="1" checked="checked" />
+										<label for="auto_login" accesskey="">自動的にログインする</label>&nbsp;[<a title="自動ログインとは、|ログインの際に必要となるオッズパークIDとパスワードの入力を省略し、毎回ログインする手間を省くことができる機能です。<br />ログイン操作時に、「自動ログインを有効にする」にチェックを入れたら、次回からはオッズパークにログインした状態の画面が表示されます。<br /><br /><strong>【自動ログイン利用時のご注意】</strong><br />自動ログインを有効にすると、オッズパークID・パスワードの入力なしにログイン後の画面を表示します。不特定多数の方が利用するパソコンでは、お客様の情報の他人による悪用を防止する為にも、「自動ログイン」は有効にしないでください。" class="clueTip" style="display: inline;">?</a>]
+									</td>
+								</tr>
+							</table>
+
+							<p class="al-center">6文字、もしくは8文字以上の登録時に設定したパスワードをご入力ください。<br>一定の回数ID・パスワード入力を間違えるとロックがかかります。</p>
+							<p class="m20">
+								<a id="btn-login" href="javascript:formSubmit();">
+									<span>ログイン</span>
+								</a>
+							</p>
+
+							<div id="inquiry">
+							<p class="title">ID・パスワードがわからない場合</p>
+							<p><a href="https://www.oddspark.com/user/new/InqTop.do" class="arrow">ID・パスワードのお問い合わせ</a></p>
+							</div>
+							<p>オッズパークにメールアドレスを登録していない場合は、こちらから確認することができませんので、サポートセンター（0120-992-040）までお問合せください。</p>
+						</form>
+					</div>
+					<!-- //LeftPanel -->
+					<!-- RightPanel -->
+					
+
+
+
+<div class="w300px pT5 bl-left">
+	<table class="tb03 new">
+		<tr>
+			<th class="registration">まだ登録されていない方は</th>		</tr>
+		<tr>
+			<td class="p10">
+				<p class="reg-title">オッズパークに会員登録&nbsp;&#40;無料&#41;&nbsp;すると</p>
+				<p class="catch">地方競馬・競輪・オートレースが買える！</p>
+				<p class="al-center"><a id="btn-sinki" href="https://www.oddspark.com/user/new/RegTop.do"><span>新規会員登録</span></a></p>
+				<p class="mB1 al-center"><a class="blank" href="/about/">オッズパークについて詳しくはこちら</a></p>
+			</td>		</tr>
+	</table>
+
+	<table class="tb03 w100pr">
+	<tr>
+		<th class="registration2"><span class="pL10">よくあるご質問</span></th>
+	</tr>
+	<tr>
+		<td>
+			<p class="p10">
+				<a href="https://faq.oddspark.com/category/show/34?site_domain=default" target="_blank">ログインに関するよくあるご質問はこちら。 </a><br />
+			</p>
+		</td>
+	</tr>
+	</table>
+</div>
+
+
+					<!-- //RightPanel -->
+				</div>
+			</div>
+			<div id="marq"><marquee>↓馬券・車券は20歳になってから↓ ↓のめり込みが不安な方はこちら（購入限度額の設定）↓</marquee></div>
+			<div class="g_attention">
+				<div>
+					<a href="/service/g_attention.html">馬券・車券は20歳になってから</a>
+				</div>
+				<div>
+					<a href="/user/my/MaxLimitMenu.do">のめり込みが不安な方はこちら（購入限度額の設定）</a>
+				</div>
+			</div>
+			<!-- //content -->
+
+			
+
+
+
+
+		<div id="footer">
+			<div id="footerInner">
+				<p id="copy">Copyright (C) Odds Park Corp. All Rights Reserved.</p>
+				<ul id="footerNav">
+				<li><a href="http://www.oddspark.com/service/company.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">会社案内</a></li>
+				<li><a href="http://www.oddspark.com/service/toiawase.pdf" target="_blank">特定商取引法に基づく表示</a></li>
+				<li><a href="http://www.oddspark.com/service/sitepolicy.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">サイトポリシー</a></li>
+				<li><a href="http://www.oddspark.com/service/privacy.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">個人情報保護方針</a></li>
+				<li><a href="/service/information-security.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">情報セキュリティ方針</a></li>
+				<li><a href="/service/customer-harassment.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">カスタマーハラスメントに対する方針</a></li>
+				<li><a href="http://www.oddspark.com/service/rule.html" onclick="window.open(this.href, '', 'width=631, height=500, menubar=no, toolbar=no, scrollbars=yes'); return false;">免責事項</a></li>
+				<li><a href="https://forms.cloud.microsoft/r/wVYPY1Qn8y" onclick="window.open(this.href, '', 'width=1020, height=740, menubar=no, toolbar=no, scrollbars=yes'); return false;">ご意見・ご要望</a></li>
+				<li><a href="http://www.oddspark.com/service/link.html" onclick="window.open(this.href, '', 'width=1020, height=740, menubar=no, toolbar=no, scrollbars=yes'); return false;">リンク</a></li>
+				</ul>
+			</div>
+			<!-- //footerInner -->
+		</div>
+		<!-- //footer -->
+<!-- Google Tag Manager -->
+<noscript><iframe src="//www.googletagmanager.com/ns.html?id=GTM-M5GLNZ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-M5GLNZ');</script>
+<!-- End Google Tag Manager -->
+
+			<script type="text/javascript">
+  (function () {
+    var tagjs = document.createElement("script");
+    var s = document.getElementsByTagName("script")[0];
+    tagjs.async = true;
+    tagjs.src = "//s.yjtag.jp/tag.js#site=mw1D83P";
+    s.parentNode.insertBefore(tagjs, s);
+  }());
+			</script>
+<noscript>
+  <iframe src="//b.yjtag.jp/iframe?c=mw1D83P" width="1" height="1" frameborder="0" scrolling="no" marginheight="0" marginwidth="0"></iframe>
+</noscript>
+<script id="bedore-webagent" charset="utf-8" src="https://webagent.bedore.jp/init.js" data-token="f7525d6f-75a3-4d51-9046-3f61f9f17f7f" data-config-index="22"></script>
+
+		</div>
+		<!-- //wrap -->
+	<script type="text/javascript"  src="/05P4w_hns/aNy1oL/QGQ/9furfb9f5GambkQ97p/ACR4OywxBA/Zy/0rMXkVJVsB"></script></body>
+</html>
+
